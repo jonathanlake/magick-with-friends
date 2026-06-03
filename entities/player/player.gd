@@ -233,6 +233,12 @@ func set_dead(dead: bool) -> void:
 	freeze = dead
 	if dead:
 		_mesh.visible = false
+		_name_label.visible = false
 	else:
-		# Remote players show their mesh; the local first-person player keeps it hidden.
+		# Remote players show their mesh + name; the local first-person player keeps both hidden.
 		_mesh.visible = not is_multiplayer_authority()
+		_name_label.visible = not is_multiplayer_authority()
+
+
+func is_dead() -> bool:
+	return _dead
