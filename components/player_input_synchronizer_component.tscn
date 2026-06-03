@@ -6,18 +6,9 @@
 properties/0/path = NodePath(".:movement_vector")
 properties/0/spawn = true
 properties/0/replication_mode = 2
-properties/1/path = NodePath(".:is_attacked_pressed")
+properties/1/path = NodePath(".:is_jump_pressed")
 properties/1/spawn = true
 properties/1/replication_mode = 2
-properties/2/path = NodePath(".:is_jump_pressed")
-properties/2/spawn = true
-properties/2/replication_mode = 2
-properties/3/path = NodePath(".:is_grab_pressed")
-properties/3/spawn = true
-properties/3/replication_mode = 2
-properties/4/path = NodePath(".:is_sprint_pressed")
-properties/4/spawn = true
-properties/4/replication_mode = 2
 
 [node name="PlayerInputSynchronizerComponent" type="MultiplayerSynchronizer" unique_id=1665501618]
 root_path = NodePath(".")
