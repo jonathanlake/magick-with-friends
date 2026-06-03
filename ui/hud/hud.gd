@@ -1,10 +1,11 @@
 extends CanvasLayer
 
 @onready var _debug_label: Label = $DebugPanel/MarginContainer/VBoxContainer/DebugLabel
-@onready var _primary_bar: ProgressBar = $DebugPanel/MarginContainer/VBoxContainer/PrimaryBar
-@onready var _bonus_bar: ProgressBar = $DebugPanel/MarginContainer/VBoxContainer/BonusBar
+@onready var _death_overlay: ColorRect = $DeathOverlay
+@onready var _death_label: Label = $DeathLabel
 
 var _player: Player = null
+var _was_dead: bool = false
 
 
 func _process(_delta: float) -> void:
@@ -12,46 +13,32 @@ func _process(_delta: float) -> void:
 		var peer_id := str(multiplayer.get_unique_id())
 		_player = get_parent().get_node_or_null(peer_id) as Player
 
-	_update_debug()
-	_update_stamina()
+	_update_readout()
+	_update_death_feedback()
 
 
-func _update_debug() -> void:
-	var lines: Array[String] = []
-
-	lines.append("── INPUTS ──")
-	lines.append("GRAB   %s" % _action_glyph("grab"))
-	lines.append("JUMP   %s" % _action_glyph("jump"))
-	lines.append("SPRINT %s" % _action_glyph("sprint"))
-	lines.append("ATTACK %s" % _action_glyph("attack"))
-	var mv := Input.get_vector("move_left", "move_right", "move_up", "move_down")
-	lines.append("MOVE   (%.2f, %.2f)" % [mv.x, mv.y])
-
-	lines.append("")
-	lines.append("── STATE ──")
-	if _player:
-		lines.append("CLIMBING  %s" % ("YES" if _player._is_climbing else "NO"))
-		lines.append("GROUNDED  %s" % ("YES" if _player._ground_check.is_colliding() else "NO"))
-		lines.append("WALL DET  %s" % ("YES" if _player._wall_detected else "NO"))
-		var n := _player._climb_normal
-		lines.append("NORMAL   (%.1f, %.1f, %.1f)" % [n.x, n.y, n.z])
-	else:
-		lines.append("(no player)")
-
-	_debug_label.text = "\n".join(lines)
-
-
-func _update_stamina() -> void:
-	if not _player or not _player._stamina:
+func _update_readout() -> void:
+	if not _player:
+		_debug_label.text = "(no player)"
 		return
-	var s: StaminaComponent = _player._stamina
-	_primary_bar.max_value = s.max_primary
-	_primary_bar.value = s.primary
-	_bonus_bar.max_value = s.max_bonus
-	_bonus_bar.value = s.bonus
+	var wand := _player.get_node_or_null("WandComponent") as WandComponent
+	var hc := _player.get_node_or_null("HealthComponent") as HealthComponent
+	var spell_text: String = wand.current_spell_text() if wand else "?"
+	var hp: int = hc.current_health if hc else 0
+	_debug_label.text = "SPELL  %s\nHP     %d" % [spell_text, hp]
 
 
-func _action_glyph(action: String) -> String:
-	if not InputMap.has_action(action):
-		return "?"
-	return "■" if Input.is_action_pressed(action) else "□"
+# Fades the local player's screen to black on death, back on respawn (cosmetic, local only).
+func _update_death_feedback() -> void:
+	if not _player:
+		return
+	var dead := _player.is_dead()
+	if dead == _was_dead:
+		return
+	_was_dead = dead
+	if dead:
+		_death_label.visible = true
+		create_tween().tween_property(_death_overlay, "modulate:a", 0.85, 0.25)
+	else:
+		_death_label.visible = false
+		create_tween().tween_property(_death_overlay, "modulate:a", 0.0, 0.4)

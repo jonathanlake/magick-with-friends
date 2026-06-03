@@ -10,3 +10,8 @@ script = ExtResource("1_ig7tw")
 spawn_path = NodePath("..")
 
 [node name="TestLevel" parent="." unique_id=805461750 instance=ExtResource("2_0xm2m")]
+
+[node name="Projectiles" type="Node3D" parent="."]
+
+[node name="ProjectileSpawner" type="MultiplayerSpawner" parent="."]
+spawn_path = NodePath("../Projectiles")

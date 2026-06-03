@@ -46,6 +46,8 @@ var _prev_sprint_pressed: bool = false
 var _lunge_queued: bool = false
 var _mantle_queued: bool = false
 var _grip_cooldown: float = 0.0
+var _wand: WandComponent
+var _dead: bool = false
 
 
 func _enter_tree() -> void:
@@ -54,6 +56,11 @@ func _enter_tree() -> void:
 
 func _ready() -> void:
 	_name_label.text = player_name
+
+	# Wand on every peer's copy (same node path) so RPC cast requests route to the host.
+	_wand = WandComponent.new()
+	_wand.name = "WandComponent"
+	add_child(_wand)
 
 	if not is_multiplayer_authority():
 		_camera.current = false
@@ -90,6 +97,9 @@ func _process(delta: float) -> void:
 	_camera_rig.global_rotation.y = _camera_yaw
 	_camera.rotation.x = _camera_pitch
 
+	if _dead:
+		return
+
 	if _grip_cooldown > 0.0:
 		_grip_cooldown -= delta
 
@@ -111,9 +121,16 @@ func _process(delta: float) -> void:
 	if _ground_check.is_colliding() and not _is_climbing:
 		_stamina.regen(delta)
 
+	# Cast: read locally on the authority peer; the wand gates by its own cooldown.
+	if _wand and Input.is_action_pressed("cast") and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		var aim := -_camera.global_transform.basis.z
+		_wand.try_cast(_camera.global_position + aim * 0.6, aim)
+
 
 func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	if not is_multiplayer_authority():
+		return
+	if _dead:
 		return
 
 	if _is_climbing:
@@ -199,46 +216,29 @@ func _integrate_movement(state: PhysicsDirectBodyState3D) -> void:
 
 
 func _detect_wall() -> void:
-	var was_climbing := _is_climbing
-
-	if not _input_sync.is_grab_pressed or _stamina.is_exhausted() or _grip_cooldown > 0.0:
-		_wall_detected = false
-		_is_climbing = false
-		return
-
-	var space := get_world_3d().direct_space_state
-	var cam_fwd := Vector3(-sin(_camera_yaw), 0.0, -cos(_camera_yaw))
-	var best_dot := -INF
+	# Climbing/parkour is cut for the slice (LMB is now Cast). Kept as a no-op so the
+	# controller and the dev HUD's climb references stay valid.
 	_wall_detected = false
-
-	# Cast 8 horizontal rays around the player to find nearby wall surfaces.
-	# Prefer the hit whose outward normal opposes the camera direction (the wall you face).
-	for i in 8:
-		var angle := i * (PI / 4.0)
-		var dir := Vector3(sin(angle), 0.0, cos(angle))
-		var query := PhysicsRayQueryParameters3D.create(
-			global_position, global_position + dir * 0.7, 0xFFFFFFFF, [get_rid()]
-		)
-		var hit := space.intersect_ray(query)
-		if hit.is_empty():
-			continue
-		var n: Vector3 = hit["normal"]
-		if n.y > 0.5:
-			continue
-		_wall_detected = true
-		var dot := cam_fwd.dot(-n)
-		if dot > best_dot:
-			best_dot = dot
-			_climb_normal = n
-
-	_is_climbing = _wall_detected
-
-	# Mantle: climbing stopped because the wall ran out (not grab release / stamina).
-	# Queue an impulse up and over the ledge using the last known wall normal.
-	if was_climbing and not _is_climbing and linear_velocity.y >= mantle_velocity_threshold:
-		_mantle_queued = true
+	_is_climbing = false
 
 
 func _on_stamina_depleted() -> void:
 	_grip_cooldown = grip_loss_cooldown
 	_is_climbing = false
+
+
+## Toggled by Main on death / respawn. Hides + freezes the body and gates input.
+func set_dead(dead: bool) -> void:
+	_dead = dead
+	freeze = dead
+	if dead:
+		_mesh.visible = false
+		_name_label.visible = false
+	else:
+		# Remote players show their mesh + name; the local first-person player keeps both hidden.
+		_mesh.visible = not is_multiplayer_authority()
+		_name_label.visible = not is_multiplayer_authority()
+
+
+func is_dead() -> bool:
+	return _dead

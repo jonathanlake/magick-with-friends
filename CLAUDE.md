@@ -46,11 +46,14 @@ not the per-pixel simulation).
   *suits* the friend-slop tone) or migrate to `CharacterBody3D` (snappier, more standard)
   is **open**. The vertical slice keeps the existing controller. **Enemies** are
   `CharacterBody3D`.
-- **Authority model.** The slice rides the existing model (per-player *input* authority,
-  *host* simulation/spawn authority). Post-slice target to decide deliberately: **per-player
-  authority over movement / character / own-HP** (crisp self-feel), but keep **host
-  authority over enemies, waves, pickups, and spell hit-resolution + world reactions**
-  (the interaction layer needs one resolver to stay consistent and *legible*).
+- **Authority model — DECIDED.** **Per-player authority** over your own character
+  (movement, position, input) for crisp self-feel — each peer simulates its own player and
+  replicates position outward. **Host authority** over damage / health / death / respawn
+  (reliable RPC *value*-sync from `Main`, not a `MultiplayerSynchronizer`) and, net-new,
+  enemies / waves / pickups / world reactions — the interaction layer needs one resolver to
+  stay consistent and *legible*. This matches Godot best practice for trusted friend co-op
+  (peer-owns-input + host-authoritative health via RPC). Client-side movement prediction is
+  **not** used; add only if real-connection playtests show input lag.
 - **Run / meta structure** beyond bare wave-survival (stages? mission arc? between-run
   progression?) — **open.** The slice is wave-survival only.
 - **Ability resource.** Per-cast **cooldown** for now; a mana pool (repurpose
@@ -132,8 +135,11 @@ ENet host/client. One player is the server (host, peer ID `1`). Others are clien
 - **Input authority:** Each player is `multiplayer_authority` over their own `Player`
   node and `PlayerInputSynchronizerComponent`. Input is gathered locally only on the
   authority peer, then synced to all.
-- **Physics / simulation authority:** Host runs the simulation. Position (and eventually
-  velocity) is synced from host to clients via `MultiplayerSynchronizer`.
+- **Physics / simulation authority:** Each player **simulates its own character** on its
+  owning peer (movement runs there); position is replicated **from the owning peer** to all
+  via `MultiplayerSynchronizer`. **Health/damage/death are host-authoritative** — resolved
+  on the host and pushed to all peers via a reliable RPC value-sync (never health-over-
+  `MultiplayerSynchronizer`, which can desync). See "Authority Model" below.
 - **Spawn authority:** Host's `MultiplayerSpawner` in `main.tscn` handles all spawning.
   Clients fire `peer_ready.rpc_id(1)` → host spawns their player via `spawn_function`.
 - **RPCs:** Use `@rpc("any_peer", "call_remote", "reliable")` for client→host calls. Use
