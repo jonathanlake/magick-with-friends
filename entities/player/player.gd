@@ -47,6 +47,7 @@ var _lunge_queued: bool = false
 var _mantle_queued: bool = false
 var _grip_cooldown: float = 0.0
 var _wand: WandComponent
+var _dead: bool = false
 
 
 func _enter_tree() -> void:
@@ -96,6 +97,9 @@ func _process(delta: float) -> void:
 	_camera_rig.global_rotation.y = _camera_yaw
 	_camera.rotation.x = _camera_pitch
 
+	if _dead:
+		return
+
 	if _grip_cooldown > 0.0:
 		_grip_cooldown -= delta
 
@@ -125,6 +129,8 @@ func _process(delta: float) -> void:
 
 func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	if not is_multiplayer_authority():
+		return
+	if _dead:
 		return
 
 	if _is_climbing:
@@ -219,3 +225,14 @@ func _detect_wall() -> void:
 func _on_stamina_depleted() -> void:
 	_grip_cooldown = grip_loss_cooldown
 	_is_climbing = false
+
+
+## Toggled by Main on death / respawn. Hides + freezes the body and gates input.
+func set_dead(dead: bool) -> void:
+	_dead = dead
+	freeze = dead
+	if dead:
+		_mesh.visible = false
+	else:
+		# Remote players show their mesh; the local first-person player keeps it hidden.
+		_mesh.visible = not is_multiplayer_authority()

@@ -61,30 +61,49 @@ func spawn_projectile(config: Dictionary) -> void:
 		projectile_spawner.spawn(config)
 
 
-## Called on the host by a projectile hit. Main is host-authoritative (its authority is
-## the default peer 1), so it can broadcast the damage to every peer.
+## Called on the host by a projectile hit. Health is host-authoritative: the host computes
+## the new value and pushes it to every peer (so peers can't desync by a hit), then drives
+## death + respawn.
 func apply_player_damage(victim_peer: int, amount: int) -> void:
-	_apply_player_damage.rpc(victim_peer, amount)
-
-
-@rpc("authority", "call_local", "reliable")
-func _apply_player_damage(victim_peer: int, amount: int) -> void:
+	if not multiplayer.is_server():
+		return
 	var player := get_node_or_null(str(victim_peer)) as Player
 	if player == null:
 		return
 	var hc := player.get_node_or_null("HealthComponent") as HealthComponent
-	if hc == null:
+	if hc == null or hc.current_health <= 0:
+		return  # ignore hits on an already-dead player
+	hc.damage(amount)
+	_sync_health.rpc(victim_peer, hc.current_health)
+	if hc.current_health <= 0:
+		_on_player_died(victim_peer)
+
+
+@rpc("authority", "call_local", "reliable")
+func _sync_health(victim_peer: int, value: int) -> void:
+	var player := get_node_or_null(str(victim_peer)) as Player
+	if player == null:
 		return
-	hc.damage(amount)  # friendly fire resolves here, identically on every peer
-	if multiplayer.is_server() and hc.current_health <= 0 and not _respawning.has(victim_peer):
-		_respawning[victim_peer] = true
-		_start_respawn(victim_peer)
+	var hc := player.get_node_or_null("HealthComponent") as HealthComponent
+	if hc:
+		hc.current_health = value
 
 
-func _start_respawn(victim_peer: int) -> void:
+func _on_player_died(victim_peer: int) -> void:
+	if _respawning.has(victim_peer):
+		return
+	_respawning[victim_peer] = true
+	_set_dead.rpc(victim_peer, true)
 	await get_tree().create_timer(GameManager.config.respawn_time).timeout
 	_respawn_player.rpc(victim_peer)
 	_respawning.erase(victim_peer)
+
+
+@rpc("authority", "call_local", "reliable")
+func _set_dead(victim_peer: int, dead: bool) -> void:
+	var player := get_node_or_null(str(victim_peer)) as Player
+	if player:
+		player.set_dead(dead)
 
 
 @rpc("authority", "call_local", "reliable")
@@ -95,6 +114,7 @@ func _respawn_player(victim_peer: int) -> void:
 	var hc := player.get_node_or_null("HealthComponent") as HealthComponent
 	if hc:
 		hc.reset()
+	player.set_dead(false)
 	# The victim's own machine teleports its own player (robust to authority config).
 	if multiplayer.get_unique_id() == victim_peer:
 		player.global_position = player_spawn_position.global_position
