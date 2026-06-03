@@ -38,6 +38,14 @@ func _update_debug() -> void:
 	else:
 		lines.append("(no player)")
 
+	lines.append("")
+	lines.append("── SPELL ──")
+	if _player:
+		var wand := _player.get_node_or_null("WandComponent") as WandComponent
+		var hc := _player.get_node_or_null("HealthComponent") as HealthComponent
+		lines.append("SPELL  %s" % (wand.current_spell_text() if wand else "?"))
+		lines.append("HP     %d" % (hc.current_health if hc else 0))
+
 	_debug_label.text = "\n".join(lines)
 
 
