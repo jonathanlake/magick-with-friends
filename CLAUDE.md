@@ -2,43 +2,63 @@
 
 Architecture reference for AI-assisted development. Read this before touching any file.
 
-This project began as a generic multiplayer "friend slop" framework and is now being
-built into an actual game. The networking spine carries over; the movement, camera, and
-combat identity are being rebuilt. **Where this document describes a system the code
-does not yet implement, it is clearly marked as roadmap (see "What Is NOT Done").**
+This project began as a generic multiplayer "friend slop" framework and is now an actual
+game. The networking spine carries over almost untouched; the movement, camera, and combat
+identity are being (re)built. **Where this document describes a system the code does not
+yet implement, it is clearly marked as roadmap (see "What Is NOT Done").**
+
+A long design pass converged the direction (the rationale lives in the design transcript /
+plan). The locked decisions are recorded below — treat them as settled unless told otherwise.
 
 ---
 
 ## Game Vision
 
-**Magick With Friends** is a **3D, online co-op roguelike**.
+**Magick With Friends** is a **3D, online co-op, first-person, horde-based** game built for
+**close friend groups** (not public matchmaking). Tone is **"friend slop"** — chaotic fun,
+friendly-fire laughs, happy accidents, jank-as-charm. It is explicitly **NOT** a
+balance-tight, optimal-build competitive game.
 
-- **Main influence — Risk of Rain 2.** A run is a series of stages. Difficulty scales
-  with elapsed time. You fight escalating hordes, find and *stack* items, buy from
-  interactables with gold, clear a per-stage objective (teleporter-style event), and
-  loop into the next, harder stage. Up to 4 players co-op, host-authoritative.
-- **Secondary influence — Noita.** Combat leans toward **wand-building / spell-
-  construction** (assembling spells + modifiers that fire in sequence, with
-  mana / cast-delay / recharge), and toward **emergent material/elemental interactions**
-  (fire that spreads, liquids, explosions, chain reactions). How deep this goes is a
-  **deliberately deferred decision** (see Combat, below).
+- **Core loop:** 2–4 players fight escalating hordes together in first-person.
+  **Friendly fire is ON and is a design pillar** — it's the comedy engine, not a footnote.
+- **Combat — the BLEND spell system (decided).** You wield a wand/staff that casts spells
+  built by *blending* a **Form** (delivery shape) with an **Element** (damage + reaction
+  layer). **One cast = one fused effect.** This captures the *feel* of Noita's wands
+  (combinatorial, emergent, things-go-wrong) but is deliberately **shallow** — it is **NOT**
+  Noita's sequence/program model (no triggers, timers, multicast, or nesting).
+- **Randomness is the keystone.** Forms/elements are dealt randomly (drops), so nobody can
+  pre-build an optimal loadout. This keeps runs fresh, blocks an external "netdeck" meta,
+  and flattens intra-group power gaps so one power-gamer friend can't pull ahead on builds.
+- **Make-or-break constraint:** chaos must be **unpredictable going in, legible in
+  hindsight.** "My fireball ricocheted into Dave" = good; "everyone took damage, nobody
+  knows why" = bad. Readable telegraphs, distinct per-element VFX, and readable reactions
+  are a **priority, not polish-later.**
 
-The camera is **third-person** (RoR2-style orbit). The core loop is being *surrounded by
-a scaling horde*, which third-person reads well — situational awareness on all sides,
-verticality, visible item-stacking on the body, and seeing your co-op teammates.
+**Influences:** the co-op horde lineage (**Left 4 Dead / Vermintide / Helldivers 2**) for
+the format and the friendly-fire chaos; **Noita** for the wand-building *feel* (the blend,
+not the per-pixel simulation).
 
 ### Open design decisions (DECIDE LATER — do not invent these)
 
-- **Combat depth.** Either deep **Noita-style wand-building** (spell + modifier slots
-  fired in sequence) **or** a simpler **fixed element-themed ability loadout**
-  (RoR2-style primary / secondary / utility / special on cooldowns). The structural
-  framework below (ability slots, projectile/effect spawning, status effects) supports
-  either; the *content model* is **TBD**.
-- **Aim style.** Center-screen reticle (aim where you look) vs a ground cursor
-  (raycast a screen-space cursor onto the world for precise AoE placement). Tied to the
-  combat decision. **TBD.**
-- **Ability resource.** Whether the existing two-pool `StaminaComponent` is repurposed
-  into a mana/energy resource or dropped for per-ability cooldowns. **TBD with combat.**
+- **Player movement controller.** The player currently ships a **first-person
+  `RigidBody3D`** controller (legacy, with a climbing/parkour system that is being cut).
+  Whether to keep `RigidBody3D` (physics-chaos — ragdolls, knockback, slips — actually
+  *suits* the friend-slop tone) or migrate to `CharacterBody3D` (snappier, more standard)
+  is **open**. The vertical slice keeps the existing controller. **Enemies** are
+  `CharacterBody3D`.
+- **Authority model.** The slice rides the existing model (per-player *input* authority,
+  *host* simulation/spawn authority). Post-slice target to decide deliberately: **per-player
+  authority over movement / character / own-HP** (crisp self-feel), but keep **host
+  authority over enemies, waves, pickups, and spell hit-resolution + world reactions**
+  (the interaction layer needs one resolver to stay consistent and *legible*).
+- **Run / meta structure** beyond bare wave-survival (stages? mission arc? between-run
+  progression?) — **open.** The slice is wave-survival only.
+- **Ability resource.** Per-cast **cooldown** for now; a mana pool (repurpose
+  `StaminaComponent`) is deferred.
+
+> **Superseded:** earlier drafts of this doc committed to *third-person*, a *RoR2 roguelite*
+> frame, and *deferred combat*. All three are now decided differently (first-person; co-op
+> horde; blend combat). Ignore any third-person / RoR2-primary framing in older history.
 
 ---
 
@@ -50,6 +70,7 @@ verticality, visible item-stacking on the body, and seeing your co-op teammates.
   `git fetch origin main && git reset --hard origin/main` to guarantee the branch starts
   from the actual current state of main. Skipping this causes merge conflicts on every PR.
 - **Open a PR when done.** Every task ends with a pull request against main.
+- **One feature per PR.** Keep PRs narrowly scoped and independently reviewable/playable.
 - **End-of-task confirmation.** After pushing, always report: branch name, whether it's
   been pushed to remote, and a list of files changed.
 
@@ -61,11 +82,12 @@ verticality, visible item-stacking on the body, and seeing your co-op teammates.
 - **3D only.** No 2D. Jolt physics, `CharacterBody3D`/`RigidBody3D`/`StaticBody3D` nodes.
 - **Jolt physics engine.** Set in `project.godot`. Do not switch to default Godot physics.
 - **No C# toolchain.** No `.csproj`, no `dotnet`, no NuGet.
-- **Do not modify UIDs** in `.tscn` or `.gd.uid` files manually.
+- **Do not modify UIDs** in `.tscn` or `.gd.uid` files manually (the editor generates them).
 - **@export everything tunable.** Any value a non-coder might want to change must be `@export`.
-- **Players (and enemies) are `CharacterBody3D`.** Kinematic, `move_and_slide`-driven —
-  not physics bodies. (The player script still needs to be migrated off `RigidBody3D` —
-  see "What Is NOT Done" item 1.)
+- **Enemies are `CharacterBody3D`** (kinematic, `move_and_slide`-driven). The **player** is
+  currently a first-person `RigidBody3D` (legacy); its controller model is an **open
+  decision** (see above). **Physics-chaos — ragdolls, knockback, slips — is a *feature* of
+  the friend-slop tone**, so `RigidBody3D` for the player is no longer ruled out.
 - **Component pattern.** Behavior goes in component nodes, not monolithic scripts.
 - **Event bus pattern.** Cross-system communication goes through `GameEvents` signals.
   No direct node references across unrelated systems.
@@ -99,20 +121,8 @@ NetworkManager.peer_disconnected(id) # any peer left
 ```
 
 **To swap ENet for Steam/relay:** replace the two lines inside `host_game()` and
-`join_game()` that create the peer. Nothing else changes.
-
-```gdscript
-# Today (ENet):
-var peer := ENetMultiplayerPeer.new()
-peer.create_server(port)
-
-# Future (Steam):
-var peer := SteamMultiplayerPeer.new()
-peer.create_host(GameManager.config.max_players)
-```
-
-The `multiplayer.*` signal layer above the transport is identical across all backends —
-NetworkManager's `_ready` wiring does not change. The file opens with a formal transport
+`join_game()` that create the peer. Nothing else changes. The `multiplayer.*` signal layer
+above the transport is identical across all backends. The file opens with a formal transport
 contract comment; read it before adding any connection code.
 
 ### Multiplayer Model
@@ -122,23 +132,25 @@ ENet host/client. One player is the server (host, peer ID `1`). Others are clien
 - **Input authority:** Each player is `multiplayer_authority` over their own `Player`
   node and `PlayerInputSynchronizerComponent`. Input is gathered locally only on the
   authority peer, then synced to all.
-- **Physics authority:** Host runs simulation. Position (and eventually velocity) is
-  synced from host to clients via `MultiplayerSynchronizer`.
+- **Physics / simulation authority:** Host runs the simulation. Position (and eventually
+  velocity) is synced from host to clients via `MultiplayerSynchronizer`.
 - **Spawn authority:** Host's `MultiplayerSpawner` in `main.tscn` handles all spawning.
   Clients fire `peer_ready.rpc_id(1)` → host spawns their player via `spawn_function`.
 - **RPCs:** Use `@rpc("any_peer", "call_remote", "reliable")` for client→host calls. Use
   `@rpc("authority", "call_local", "reliable")` for host→all broadcasts.
 
-**This same host-authoritative model governs everything net-new** — enemies, the spawn
-director, projectiles/spell effects, item pickups, and run/stage state all run on the
-host and replicate outward. Clients send intent (input, interact requests) via the
-authority/RPC patterns above; the host owns the simulation.
+**This same host-authoritative model governs everything net-new** — enemies, the wave
+spawner, projectiles/spell effects, world reactions, item/spell pickups, and run state all
+run on the host and replicate outward. Clients send intent (input, interact/cast requests)
+via the authority/RPC patterns above; the host owns the simulation. Cast *feel* on clients
+is provided by **local cosmetic feedback only** (muzzle flash) — never client-authoritative
+damage or reactions. (See the authority-model open decision for the post-slice target.)
 
 ### Node Ownership Pattern
 
 ```
 Main (Node) — no authority set, runs on all peers
-└── Player_{peer_id} (CharacterBody3D) — authority = peer_id
+└── Player_{peer_id} (first-person body) — authority = peer_id
     ├── PlayerInputSynchronizerComponent — authority = peer_id (gathers input locally, syncs out)
     └── MultiplayerSynchronizer — authority = peer_id (syncs position from host outward)
 ```
@@ -155,8 +167,8 @@ Godot 4 `MultiplayerSynchronizer` replication modes used in this project:
 - **Mode 2** (`REPLICATION_MODE_ON_CHANGE`) — syncs only when value changes. Used for
   the synced input fields in `PlayerInputSynchronizerComponent`.
 
-When adding replicated properties to the player, add `velocity` (mode 1) to the player's
-`MultiplayerSynchronizer` alongside `global_position` for smooth client interpolation.
+When adding replicated properties to the player, add `velocity` (mode 1) alongside
+`global_position` for smooth client interpolation.
 
 ### SceneReplicationConfig NodePath Syntax
 
@@ -192,31 +204,58 @@ synchronizers inherit the authority automatically.
 
 `GameConfig` (`resources/game_config.gd`) is a `Resource` subclass holding session-level
 settings (currently `max_players`, `round_timer`, `respawn_time`). It is not an autoload —
-it's plain data. Expect it to grow run-level fields (difficulty curve, stage count, etc.).
+it's plain data. Expect it to grow run-level fields.
 
 `GameManager` (`autoloads/game_manager.gd`) is an autoload `Node` that owns a `GameConfig`
 instance (`GameManager.config`) and the local `player_name`. The host sets
 `GameManager.config` values before starting the server. All game systems read from
-`GameManager.config`. `GameManager` is the natural home for the **run/stage state
-machine** (see roadmap).
+`GameManager.config`. `GameManager` is the natural home for any future run/wave state.
 
-### Third-Person Camera (Target Design)
+### First-Person Camera (current)
 
-**ROADMAP — not yet implemented.** The player currently still ships a *first-person*
-rig; it is being replaced with a third-person orbit camera.
+The player ships a **first-person** rig (camera on the player body). Movement is
+first-person and **casting aims forward** from the camera (where you look) — keep the aim
+output simple (a forward raycast / muzzle spawn point), no ground-cursor in the slice.
 
-Target design:
+The legacy controller also carries a climbing/parkour camera path that is **being cut**
+(roadmap item 1). The player movement-controller decision (`RigidBody3D` vs
+`CharacterBody3D`) is open but does not change the first-person camera.
 
-- A `SpringArm3D` anchored to (or following) the player, with the `Camera3D` on its tip,
-  so the camera pulls in automatically when geometry occludes it.
-- Orbit (yaw/pitch) driven by mouse / right-stick; pitch clamped to a sane overhead range.
-- **Movement is camera-relative:** WASD maps onto the camera's flattened forward/right
-  basis, so "forward" means "away from camera".
-- **Aim** (reticle vs ground cursor) is **TBD** and decided with combat. Keep the camera
-  controller's aim output behind a small seam so either can slot in later.
+### Spell System — BLEND (decided, the combat core)
 
-Until migrated, see "What Is NOT Done" item 1. The legacy first-person notes are
-intentionally removed from this document.
+A spell is a **fusion of two parts**, held in two swappable slots and fused **on cast**:
+
+- **Form** — the delivery shape, and where the mechanical distinctness lives. Ceiling ~7
+  (projectile, beam, cone, wall, bubble, AoE burst, trap orb). *Slice:* Projectile, AoE burst.
+- **Element** — a thin **damage + reaction** layer on top, driven by a small **reaction
+  table**. Sparse — not every element needs every form. *Slice:* Fire, Lightning.
+- **Modifier** — *optional.* Event-multiplying / trajectory-scrambling modifiers (Split,
+  Bounce, Homing) erode the per-cast legibility that is the whole reason we picked blend →
+  **omitted in the slice**, constrained later.
+
+**One cast = one fused effect.** This is NOT a sequence/program (no triggers/timers/
+multicast/nesting — that's the Noita engine, deliberately rejected). Depth is **deliberately
+shallow**; no deep stat-tuning knobs. Implemented as `@export`-driven Resources under
+`systems/spells/` (`Spell` / `SpellForm` / `SpellElement`), cast by a `WandComponent` on the
+player that holds the `(Form, Element)` pair and enforces a per-cast `cast_delay`.
+
+**Reactions are the emergent chaos**, in two cheap layers (NOT a per-pixel sim):
+
+- **Entity reactions** (status): e.g. Lightning **chains** to nearby units *including
+  allies*; Fire applies a **burning DoT** that spreads to adjacent units.
+- **World reactions:** a few hand-placed `Area3D` **reactive volumes** with a material tag
+  (oil, water). Lightning in water electrifies everyone inside; fire ignites oil and spreads.
+  This is the *signature* environmental chaos — done with trigger volumes, **not** a
+  falling-sand simulation (that stays out of scope; see Future Considerations).
+
+**Acquisition is random and keep-or-swap.** Forms/elements drop from enemies. Picking one up
+is a **deliberate interact-to-swap** (proximity prompt → press interact) that **drops your
+previous spell as a re-grabbable pickup** — a real "keep my Fire or take this Lightning?"
+decision with a tradeoff, never a silent walk-over overwrite. Randomness keystone intact;
+composition genuinely exercised.
+
+All of the above is **host-authoritative**: casts originate on the authority peer, spawn and
+resolve on the host (damage incl. friendly fire, reactions), and replicate out.
 
 ---
 
@@ -225,61 +264,52 @@ intentionally removed from this document.
 ```
 autoloads/
   game_events.gd              — Global signal bus. Add signals here, not in random scripts.
-                                Currently only has a leftover `enemy_died` — see roadmap item 2.
-  game_manager.gd             — Autoload Node. Owns GameConfig + local player_name. Set by host
-                                before server start. Future home of the run/stage state machine.
+                                Currently only a leftover `enemy_died` — see roadmap.
+  game_manager.gd             — Autoload Node. Owns GameConfig + local player_name.
   network_manager.gd          — Transport abstraction. ONLY file that touches ENet/Steam/relay.
-                                Exposes host_game(), join_game(ip), disconnect_game(), and
-                                connection/peer signals. See NetworkManager section above.
 
 components/
   health_component.gd/.tscn   — max_health (export), current_health, damage(int), died signal.
-                                Default max_health is currently 1 — bump to 100 (roadmap item 3).
-                                Reused by both players and enemies.
-  stamina_component.gd/.tscn  — Two-pool resource (primary + bonus buffer) with regen and a
-                                `depleted` signal. Built for parkour; PARKOUR IS BEING CUT, so this
-                                is repurpose-or-remove pending the combat decision (mana/energy?).
+                                Default max_health → 100 (slice) so friendly fire is funny,
+                                not instant-death. Reused by players and enemies.
+  stamina_component.gd/.tscn   — Two-pool resource + `depleted` signal. PARKOUR IS CUT;
+                                repurpose-or-remove — candidate mana pool (deferred).
   player_input_synchronizer_component.gd/.tscn
-                              — Extends MultiplayerSynchronizer. Reads input on the authority peer
-                                and replicates it (mode 2). The synced fields are being re-pointed
-                                from climbing/parkour inputs to action/ability slots (roadmap).
+                              — Extends MultiplayerSynchronizer. Gathers input on the
+                                authority peer, replicates it (mode 2). Synced fields being
+                                re-pointed to action slots (move, jump, cast, interact).
 
-entities/player/
-  player.gd                   — LEGACY: still a first-person RigidBody3D with climbing/mantle.
-                                Slated for a full rewrite to a third-person CharacterBody3D
-                                (run/jump/sprint + dash). See "What Is NOT Done" item 1.
-  player.tscn                 — Node tree to be reworked alongside the script: CharacterBody3D root,
-                                InputSync, position/velocity MultiplayerSynchronizer, HealthComponent,
-                                MeshInstance3D + CollisionShape3D (capsule), NameLabel, GroundCheck,
-                                third-person camera rig (SpringArm3D + Camera3D).
+entities/
+  player/
+    player.gd                 — LEGACY first-person RigidBody3D with climbing/parkour.
+                                Slice: climbing disabled, LMB → cast. Controller model
+                                (RigidBody3D vs CharacterBody3D) is an open decision.
+    player.tscn               — FP body, InputSync, MultiplayerSynchronizer, HealthComponent,
+                                mesh + capsule collider, NameLabel, camera, WandComponent.
+  projectiles/                — (new) spell projectile/effect scenes, host-spawned.
+  enemies/                    — (new) EnemyBase (CharacterBody3D + HealthComponent + host AI).
+  pickups/                    — (new) Form/Element spell pickups (interact-to-swap).
+
+systems/
+  spells/                     — (new) Spell/SpellForm/SpellElement resources + WandComponent.
+  reactions/                  — (new) reaction table + Area3D reactive world volumes.
+  director/                   — (new) host-side wave spawner (timer + escalating count).
 
 resources/
   game_config.gd              — Resource. max_players, round_timer, respawn_time. Not an autoload.
 
-ui/main_menu/
-  main_menu.gd                — Host/join flow. Validates name, parses IP:port (default
-                                127.0.0.1:3000), writes GameManager.player_name, transitions scene.
-  main_menu.tscn              — Name field, IP field, Host button, Join button.
+ui/
+  main_menu/                  — Host/join flow. Validates name, parses IP:port (default 127.0.0.1:3000).
+  hud/                        — DEV debug HUD (CanvasLayer). Slice adds a current-spell
+                                (Form+Element) readout + a proximity swap prompt.
 
 debug/
-  debug.gd                    — Dev-only autostart helper. Registered as DEBUG autoload but DISABLED
-                                by default (no * prefix in project.godot). Reads
-                                OS.get_cmdline_user_args(): `-- host debug_autostart` → host;
-                                `-- join debug_autostart` → join. Never enable for shipping builds.
+  debug.gd                    — Dev-only autostart helper. DEBUG autoload, DISABLED by default.
 
-ui/hud/
-  hud.gd/.tscn                — DEV debug HUD (CanvasLayer). Input glyphs + state readout + the two
-                                stamina ProgressBars. A production HUD is still to be built (item 5).
-
-main.gd                       — MultiplayerSpawner setup, peer_ready RPC, spawn_function lambda
-                                (names player by peer ID, sets authority, applies player_name).
-                                Instantiates the dev HUD on _ready.
+main.gd                       — MultiplayerSpawner setup, peer_ready RPC, spawn_function.
 main.tscn                     — World root: MultiplayerSpawner + a level instance.
-test_level.tscn               — Dev sandbox: CSG geometry (platforms, ramps, walls, a pillar).
-                                Originally tuned for climbing tests; now just a movement/combat
-                                sandbox. Open directly in editor to test.
-project.godot                 — Autoloads (GameEvents, GameManager, NetworkManager, DEBUG-disabled),
-                                input map, Jolt, 1920×1080, D3D12. NOTE: application/config_name is
+test_level.tscn               — Dev sandbox arena (CSG). Now a movement/combat sandbox.
+project.godot                 — Autoloads, input map, Jolt, 1920×1080, D3D12. NOTE: config_name
                                 still "Friend Slop Framework" — rename to "Magick With Friends".
 ```
 
@@ -291,14 +321,12 @@ The reusable spine that is real and working today:
 
 - [x] Project scaffolding — Jolt, Forward Plus, 1920×1080, D3D12 on Windows
 - [x] **`NetworkManager` autoload** — swappable transport layer; ENet today, Steam/relay ready
-- [x] ENet host/join — host creates server peer, client creates client peer, both transition
-      to the main scene on connect
-- [x] **Multiplayer connection flow** — host spawns self directly; clients send `peer_ready`
-      RPC (call_remote, timing-safe); max_players gate; despawn on disconnect via
-      `NetworkManager.peer_disconnected`
-- [x] `MultiplayerSpawner` in `main.tscn` with a `spawn_function` that names the player by
-      peer ID, sets authority, and applies the display name
-- [x] `PlayerInputSynchronizerComponent` — gathers input on the authority peer and syncs it (mode 2)
+- [x] ENet host/join — both peers transition to the main scene on connect
+- [x] **Multiplayer connection flow** — host spawns self; clients send `peer_ready` RPC;
+      max_players gate; despawn on disconnect via `NetworkManager.peer_disconnected`
+- [x] `MultiplayerSpawner` in `main.tscn` with a `spawn_function` (names by peer ID, sets
+      authority, applies display name)
+- [x] `PlayerInputSynchronizerComponent` — gathers input on the authority peer, syncs it (mode 2)
 - [x] Player `MultiplayerSynchronizer` — replicates `global_position` (mode 1, spawn=true)
 - [x] `HealthComponent` — `max_health`, `damage()`, `died` signal (component pattern)
 - [x] `StaminaComponent` — two-pool resource + `depleted` signal (pending repurpose)
@@ -307,24 +335,23 @@ The reusable spine that is real and working today:
 - [x] **IP input field** + name validation in the main menu (falls back to `127.0.0.1:3000`)
 - [x] Floating name labels over players; placeholder capsule meshes
 - [x] **DEBUG autoload** — disabled-by-default two-window autostart (see below)
-- [x] Two-player local multiplayer verified — host and client see each other move
+- [x] Two-player local multiplayer verified — host and client see each other move (first-person)
 
-> Movement currently works via the legacy first-person `RigidBody3D` controller (with a
-> climbing/mantle/parkour-stamina system). That controller is **being replaced**, not kept
-> — it is listed here only to describe the current running state, not the target design.
+> The first-person movement currently runs through the **legacy `RigidBody3D` controller**
+> (with a climbing/parkour system). That climbing/parkour is **being cut**; the first-person
+> movement itself is **kept** for the slice (the slice tests spells, not locomotion).
 
 ---
 
 ## DEBUG Autoload — Dev Workflow
 
 `debug/debug.gd` is registered as the `DEBUG` autoload in `project.godot` **without** the
-`*` prefix, which means it is **disabled by default**. It never runs in normal play or in
-exported builds.
+`*` prefix, so it is **disabled by default**. It never runs in normal play or exported builds.
 
 ### Enabling for local two-window testing
 
-1. **Enable the autoload** — Project Settings → Autoload → check `DEBUG` (or manually add
-   `*` before `res://debug/debug.gd` in `project.godot`).
+1. **Enable the autoload** — Project Settings → Autoload → check `DEBUG` (or add `*` before
+   `res://debug/debug.gd` in `project.godot`).
 2. **Configure Run Instances** — Debug → Customize Run Instances, two instances:
 
    | Instance | Arguments |
@@ -332,122 +359,59 @@ exported builds.
    | 1 (Host) | `-- host debug_autostart` |
    | 2 (Client) | `-- join debug_autostart` |
 
-   The `--` separator is required — everything after it is a user arg, read via
+   The `--` separator is required — everything after it is read via
    `OS.get_cmdline_user_args()`. Optionally offset window 2 (e.g. x=960) so they don't overlap.
 3. **Hit Play (F5).** Both windows launch. Host titles itself `HOST`, client `CLIENT`.
 
 ### Disabling before shipping / returning to normal play
-
-Both must be true for debug autostart to be fully off:
 
 | Step | Enabled | Disabled |
 |------|---------|----------|
 | `project.godot` DEBUG line | `DEBUG="*res://debug/debug.gd"` | `DEBUG="res://debug/debug.gd"` |
 | Run Instances Launch Arguments | `-- host/join debug_autostart` | **cleared** |
 
-**Important:** Godot passes Launch Arguments even when "Override Main Run Args" is
-unchecked. You must **clear the Launch Arguments**, not just uncheck the autoload. Both
-steps are required.
+**Important:** Godot passes Launch Arguments even when "Override Main Run Args" is unchecked.
+You must **clear the Launch Arguments**, not just uncheck the autoload. Both steps are required.
 
 ### Rule
 Never commit `project.godot` with `DEBUG="*res://debug/debug.gd"`. The `*` is dev-local only.
 
 ---
 
-## What Is NOT Done (Priority Order)
+## What Is NOT Done (the Vertical Slice, then beyond)
 
-This is the roadmap from the current framework state to the game. Everything below is
-host-authoritative and reuses the existing `MultiplayerSpawner` / RPC / `GameEvents`
-patterns.
+The immediate work is a **cheap vertical slice** — the smallest thing that lets 2–4 friends
+play and answers "is the core fun?" Built on the existing co-op framework, **one feature per
+PR**, legibility baked into each PR (not deferred). Everything is host-authoritative and
+reuses the `MultiplayerSpawner` / RPC / `GameEvents` patterns.
 
-### 1. Rewrite the Player: first-person RigidBody3D → third-person CharacterBody3D
-The single biggest change. Replace the legacy controller with a kinematic
-`CharacterBody3D` driven by `move_and_slide`:
-- Camera-relative WASD run, jump, sprint, and a RoR2-style **dash/dodge** utility.
-- **Remove** all climbing, 8-ray wall detection, mantle, and lunge logic.
-- Build the **third-person orbit camera** (SpringArm3D + Camera3D) described above.
-- Rework `player.tscn` accordingly; keep `class_name Player` (main.gd's `spawn_function`
-  casts to it) and the `_enter_tree` authority timing.
-- Re-point `PlayerInputSynchronizerComponent`'s synced fields from parkour inputs to
-  action slots (move, jump, sprint, dash, interact, ability primary/secondary/utility/special).
+1. **Player FP controller cleanup.** Disable climbing/parkour; repurpose `grab` (LMB) →
+   `cast`. Keep the first-person movement. (RigidBody3D-vs-CharacterBody3D decided later.)
+2. **Blend spell core + friendly fire + respawn.** `Spell`/`SpellForm`/`SpellElement`
+   resources, `WandComponent` (Form+Element slots, `cast_delay`), Projectile + Fire,
+   host-authoritative projectile spawn, FF damage on `HealthComponent` (default → 100),
+   immediate local cosmetic cast feedback, current-spell HUD, cheap respawn.
+3. **Enemies + wave spawner.** `EnemyBase` (CharacterBody3D, host AI: steer to nearest
+   player + melee); `systems/director/` timer spawner with escalating waves.
+4. **Blend matrix + reactions + world volumes.** AoE burst + Lightning; reaction table
+   (lightning chain incl. allies, fire burn-spread); 1–2 `Area3D` reactive volumes (oil,
+   water). Distinct per-element VFX as a done-criterion.
+5. **Random keep-or-swap acquisition.** Enemy-dropped Form/Element pickups; `interact`
+   action; interact-to-swap that drops the old spell as a re-grabbable pickup.
+6. **Legibility tightening pass**, then the 30-minute friend playtest.
 
-### 2. GameEvents Signals
-`game_events.gd` has a leftover `enemy_died` signal and `emit_enemy_died()` helper.
-Replace with the game's vocabulary and let callers emit directly:
-```gdscript
-signal player_died(peer_id: int)
-signal enemy_died(enemy_id: int, position: Vector3)
-signal run_started
-signal stage_started(stage_index: int)
-signal stage_cleared(stage_index: int)
-signal run_ended(victory: bool)
-signal item_picked_up(peer_id: int, item_id: StringName)
-```
-
-### 3. HealthComponent for a real game
-Change `max_health` default from `1` to `100`. Add the RoR2-style extensions: passive
-regen, a shield/barrier pool, brief invincibility frames after a hit, and knockback
-(applied as a `CharacterBody3D` velocity, not an impulse). Used by players and enemies.
-
-### 4. Input Map: ability + interact actions, and gamepad
-`project.godot` currently has `move_*`, `grab` (LMB), `attack` (RMB), `sprint`, `jump` —
-several of those names are parkour leftovers. Define the action slots the new controller
-needs (cast primary/secondary, utility, special, interact) and add gamepad bindings:
-- `move_*` → left stick; look → right stick (handled in the camera script, not the map)
-- jump → South face button; dash/abilities/interact → TBD buttons/triggers
-
-### 5. Production In-Game HUD
-A dev debug HUD exists (`ui/hud/`). Build a production HUD: health + shield bar, ability
-icons with cooldown sweeps, item inventory (stacks), gold/credits, and a run timer +
-difficulty meter. Reads the local player's components; listens to `GameEvents`.
-
-### 6. Run / Stage State Machine
-The structural heart of the RoR2 loop, owned at the `GameManager` level: `run_started` →
-`stage_started` → a per-stage objective/teleporter event → `stage_cleared` → next (harder)
-stage → … → `run_ended`. Drives difficulty scaling and emits the `GameEvents` above.
-
-### 7. Spawn Director / Enemy Spawning
-Host-side director (`autoloads/director.gd` or under `systems/`) with a **credit budget**
-that grows with elapsed time and stage index. It picks enemies from a spawn table and
-replicates them via a `MultiplayerSpawner`. This is what makes the horde scale.
-
-### 8. Enemy Entities
-`EnemyBase` (`CharacterBody3D`) reusing `HealthComponent`, with simple host-run AI
-(navigate toward the nearest player, attack in range). Death emits `enemy_died` and rolls
-drops (gold, items). Lives under `entities/enemies/`.
-
-### 9. Items / Pickups / Currency
-Stacking-item inventory component, item-effect hooks fired off `GameEvents`, gold/credits,
-and interactables (chests, shops) with a purchase cost. Items drop from enemies/chests.
-Visual item-stacking on the body is a later nicety.
-
-### 10. Abilities / Spell System (combat — DECIDE LATER)
-Build the *framework* (ability/spell slots, cooldowns or mana, projectile/effect spawning
-& sync, elemental **status effects** like burn/chill/shock as a status-component pattern)
-**without committing the content model**. The fork — deep **Noita wand-building** vs a
-**fixed element-themed loadout** — is an explicit open decision. Do not pick one
-unprompted.
-
-### 11. Spawn Point System
-`main.tscn` has a single spawn marker. Add several (4–8) spread around the arena, selected
-by player index so players don't spawn on top of each other.
-
-### 12. Client-Side Authority Propagation
-`input_multiplayer_authority` is set by `main.gd`'s `spawn_function`, which runs on the
-**host**. Clients receive the spawned node via replication but `spawn_function` does not
-run on clients, so `set_multiplayer_authority()` is never called on their copy. Works for
-same-machine testing (all peers are peer 1); needs fixing for real multiplayer. Options:
-include the peer ID in the spawn state, RPC the host→client `set_multiplayer_authority`,
-or parse it from the node name on the client's `MultiplayerSpawner.spawned` signal.
-
-### 13. Velocity Sync for Smooth Interpolation
-The player `MultiplayerSynchronizer` only syncs `global_position`. Add `velocity` (mode 1)
-for smoother client-side interpolation once movement feel is stable. Godot 4.6's
-`MultiplayerSynchronizer` interpolation can be enabled then too.
-
-### 14. Main Menu / Project Cleanup
-Wire the main menu to set `GameManager.config` (max_players, etc.) before hosting. Rename
-`application/config_name` from "Friend Slop Framework" to "Magick With Friends".
+Beyond the slice (only if it proves fun):
+- **GameEvents vocabulary** — replace `enemy_died` with `player_died`, `enemy_died(pos)`,
+  `wave_started`, `run_ended`, `spell_picked_up`, etc.; let callers emit directly.
+- **Authority-model decision** (per-player self / host shared) before building past the slice.
+- **Run / meta structure** beyond wave-survival.
+- **Production HUD** (health/shield, current spell, wave/timer).
+- **Spawn point system** (4–8 points, by player index).
+- **Client-side authority propagation** (`spawn_function` runs on host only — clients never
+  call `set_multiplayer_authority`; fine for same-machine, needs fixing for real MP).
+- **Velocity sync** for smoother client interpolation.
+- **More Forms/Elements**, modifiers (constrained), mana resource, downed/revive.
+- **Project cleanup:** rename `application/config_name` to "Magick With Friends".
 
 ---
 
@@ -455,14 +419,12 @@ Wire the main menu to set `GameManager.config` (max_players, etc.) before hostin
 
 ### Naming
 - Scripts: `snake_case.gd`
-- Classes: `PascalCase` (`class_name PlayerInputSynchronizerComponent`)
-- Signals: `snake_case` past tense (`player_died`, `stage_cleared`)
-- Exported variables: `snake_case`, with units in the name where helpful (`dash_force`,
-  `respawn_time_sec`) — or just use comments
+- Classes: `PascalCase` (`class_name WandComponent`)
+- Signals: `snake_case` past tense (`spell_cast`, `wave_started`)
+- Exported variables: `snake_case`, with units in the name where helpful (`cast_delay_sec`)
 - Node names in scenes: `PascalCase`
 
 ### Script Structure (within a .gd file)
-
 ```
 class_name / extends
 signals
@@ -479,79 +441,71 @@ RPC methods (grouped at bottom, prefixed with intent)
 
 ### Component Pattern
 A "component" is a `Node` (or `MultiplayerSynchronizer`) scene that encapsulates one
-responsibility. It does not reach up to its parent — it exposes signals and methods, and
-the parent or a coordinator wires them together in `_ready`.
+responsibility. It does not reach up to its parent — it exposes signals and methods, and the
+parent or a coordinator wires them together in `_ready`.
 
 ### RPC Pattern
 - Client → Host: `@rpc("any_peer", "call_remote", "reliable")` — host checks
   `multiplayer.get_remote_sender_id()`
 - Host → All: `@rpc("authority", "call_local", "reliable")` on a node the host owns
-- Player input is **never** sent via RPC — use `MultiplayerSynchronizer` (lower overhead,
-  automatic)
+- Player input is **never** sent via RPC — use `MultiplayerSynchronizer`
 
 ### Scene Instancing
 Use `preload("uid://...")` for scenes and scripts referenced in code. Never use string
 paths like `"res://entities/player/player.tscn"` — UIDs survive file moves.
 
-### Physics (Jolt + CharacterBody3D)
-- Players and enemies are **`CharacterBody3D`**. Drive them with `move_and_slide()` after
-  setting `velocity`.
-- Gravity: accumulate `velocity += get_gravity() * delta` each `_physics_process` while
-  not on floor; check `is_on_floor()` for grounded state and jump eligibility.
-- Horizontal movement: lerp/accelerate `velocity.x`/`velocity.z` toward the camera-relative
-  input direction × speed; apply friction only to the horizontal plane so jumps/gravity
-  on Y are unaffected.
-- **Knockback / impulses** are applied by adding to `velocity` directly — there is no
-  `apply_central_impulse` on a `CharacterBody3D`.
-- Jolt is still the engine (set in `project.godot`); test interactions with Jolt enabled,
-  as its collision response differs from Godot default physics.
-- `RigidBody3D` is still allowed for *physics props* (throwables, debris) — just not for
-  the player/enemy controllers.
+### Physics (Jolt)
+- **Enemies** are `CharacterBody3D` — drive with `move_and_slide()` after setting `velocity`;
+  gravity via `get_gravity()`; `is_on_floor()` for grounded checks. Knockback = add to `velocity`.
+- **Player** currently `RigidBody3D` (first-person, legacy). Knockback there is an impulse.
+  Controller model is an open decision; don't assume one when writing player-agnostic code.
+- **Physics-chaos is a feature** of the friend-slop tone — ragdolls, knockback, ice-slips.
+  Keep gameplay-critical physics on a single owner; let purely-cosmetic chaos be loose.
+- `RigidBody3D` is fine for physics props (throwables, debris) regardless.
+- Jolt is the engine (`project.godot`); test with Jolt enabled — its collision response
+  differs from default Godot physics.
 
-### Camera Rig Pattern (Third-Person — target)
-A `SpringArm3D` parented to (or following) the player carries the `Camera3D` on its tip so
-the camera auto-pulls-in on occlusion. Orbit yaw/pitch come from mouse/right-stick (pitch
-clamped to a sensible overhead range). Movement input is transformed into the camera's
-flattened forward/right basis so "up" on the stick means "away from camera". Keep the
-aim-target output (reticle vs ground-cursor raycast) behind a small seam — it's **TBD**.
+### Camera Rig Pattern (First-Person)
+The camera lives on the player body. Casting aims forward from the camera (a forward raycast
+/ muzzle spawn). No ground-cursor in the slice. Cast *feel* on clients comes from immediate
+local cosmetic feedback (muzzle flash), decoupled from host-authoritative resolution.
 
 ---
 
 ## Known Issues / Watch Out For
 
-- **Player controller is mid-migration.** The shipped `player.gd` is still the legacy
-  first-person `RigidBody3D` parkour controller. Treat its movement/camera code as
-  scheduled for replacement (roadmap item 1), not as the pattern to extend.
-- **Spawn height vs capsule:** the spawn marker sits near `y=0`; with a 0.9 m capsule
-  half-height, spawning at `y=0` clips the body into the ground. Keep spawn markers at
-  least `y≈1.0`. Re-verify once the controller is `CharacterBody3D`.
-- **`input_multiplayer_authority` on clients:** see roadmap item 12. Local same-machine
-  testing works because `is_multiplayer_authority()` defaults to peer 1; real authority
-  propagation is deferred.
+- **Player controller is legacy.** `player.gd` is still the first-person `RigidBody3D`
+  parkour controller. The slice disables climbing and repoints LMB → cast; treat the
+  movement/climbing code as scheduled for cleanup, not a pattern to extend.
+- **Cast feel is host-asymmetric.** Pure host-authority means the host feels instant casts
+  and clients eat a round-trip. Use the local cosmetic muzzle flash, and read playtests
+  knowing host feel ≠ client feel (rotate who hosts).
+- **Spawn height vs capsule:** keep spawn markers at `y≈1.0`+ so the capsule doesn't clip
+  the floor.
+- **`input_multiplayer_authority` on clients:** `spawn_function` runs on the host only, so
+  clients never call `set_multiplayer_authority` on their copy. Works for same-machine
+  testing (all peers are peer 1); needs fixing for real multiplayer.
 - `main_menu.gd` defaults to `127.0.0.1` and port `3000` (keep the port an `int` — ENet
-  requires it). Same-machine / LAN testing until a real address is entered.
-- `multiplayer.connected_to_server` is only wired for the client path. The host transitions
-  immediately — this is correct; do not add `connected_to_server` handling for the host.
+  requires it).
+- `multiplayer.connected_to_server` is only wired for the client path; the host transitions
+  immediately — correct, don't add host-side handling.
 - `class_name Player` must stay — `main.gd`'s `spawn_function` casts to `Player`.
-- `project.godot` still names the app "Friend Slop Framework" (roadmap item 14).
+- `project.godot` still names the app "Friend Slop Framework" (rename pending).
 
 ---
 
 ## Future Considerations (Do Not Implement Yet)
 
-- **Noita-style material simulation.** Emergent material/elemental interactions (fire
-  spreading across surfaces/liquids, explosions, electrified water, chain reactions). Full
-  per-voxel/per-particle simulation is expensive and hard to net-replicate in 3D —
-  approximate it (status-tagged volumes, area triggers, simple propagation) before
-  attempting anything simulation-grade. Out of scope until core combat lands.
-- **Steam networking** — replace the ENet peer with `SteamMultiplayerPeer` from GodotSteam.
-  Keep all spawn/RPC logic identical (that's the whole point of `NetworkManager`).
-- **Cloudflare Workers / WebSocket relay** — for online play without port forwarding.
-- **Game mode system** — a `GameMode` resource/autoload listening to `GameEvents` that
-  enforces variant rules (scoring, modifiers, objectives). Design as optional.
-- **Spectator camera** — free-fly cam for dead players, constrained to world bounds, until
-  the next stage / revive.
-- **Lobby / ready system** — pre-run lobby with character select and a ready check before
-  the host starts the run.
-- **Right-stick look (gamepad)** — `Input.get_axis(...)` in the camera script; needs the
-  look actions added to `project.godot`.
+- **Noita-style material simulation.** The blend reaction layer uses cheap `Area3D` volumes,
+  NOT a per-pixel falling-sand sim. Full simulation (fire spreading per-pixel, liquids,
+  electrified water at sim fidelity) is expensive and hard to net-replicate in 3D — stay with
+  tagged volumes / area triggers until there's a reason not to.
+- **Authority model** — formalize per-player-self / host-shared split (see open decisions).
+- **Mana resource** — repurpose `StaminaComponent` if cooldowns prove too shallow.
+- **Run / meta structure** — stages, between-run progression, objectives.
+- **Steam networking** — replace the ENet peer with `SteamMultiplayerPeer`; keep all
+  spawn/RPC logic identical (the point of `NetworkManager`).
+- **Cloudflare Workers / WebSocket relay** — online play without port forwarding.
+- **Lobby / ready system**, **spectator camera** for dead players, **gamepad** bindings +
+  right-stick look.
+```
