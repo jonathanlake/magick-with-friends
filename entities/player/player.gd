@@ -42,7 +42,6 @@ var _jump_queued: bool = false
 var _is_climbing: bool = false
 var _wall_detected: bool = false
 var _climb_normal: Vector3 = Vector3.ZERO
-var _prev_sprint_pressed: bool = false
 var _lunge_queued: bool = false
 var _mantle_queued: bool = false
 var _grip_cooldown: float = 0.0
@@ -110,12 +109,6 @@ func _process(delta: float) -> void:
 	if jump_now and not _prev_jump_pressed:
 		_jump_queued = true
 	_prev_jump_pressed = jump_now
-
-	# Rising-edge detection for lunge (sprint while climbing).
-	var sprint_now := _input_sync.is_sprint_pressed
-	if sprint_now and not _prev_sprint_pressed and _is_climbing:
-		_lunge_queued = true
-	_prev_sprint_pressed = sprint_now
 
 	# Regen primary stamina when grounded and not climbing.
 	if _ground_check.is_colliding() and not _is_climbing:
