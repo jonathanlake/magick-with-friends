@@ -40,12 +40,11 @@ not the per-pixel simulation).
 
 ### Open design decisions (DECIDE LATER — do not invent these)
 
-- **Player movement controller.** The player currently ships a **first-person
-  `RigidBody3D`** controller (legacy, with a climbing/parkour system that is being cut).
-  Whether to keep `RigidBody3D` (physics-chaos — ragdolls, knockback, slips — actually
-  *suits* the friend-slop tone) or migrate to `CharacterBody3D` (snappier, more standard)
-  is **open**. The vertical slice keeps the existing controller. **Enemies** are
-  `CharacterBody3D`.
+- **Player movement controller.** The player ships a **first-person `RigidBody3D`**
+  controller (run / jump / look / cast; climbing/parkour removed). Whether to keep
+  `RigidBody3D` (physics-chaos — ragdolls, knockback, slips — actually *suits* the
+  friend-slop tone) or migrate to `CharacterBody3D` (snappier, more standard) is **open**.
+  **Enemies** are `CharacterBody3D`.
 - **Authority model — DECIDED.** **Per-player authority** over your own character
   (movement, position, input) for crisp self-feel — each peer simulates its own player and
   replicates position outward. **Host authority** over damage / health / death / respawn
@@ -223,9 +222,9 @@ The player ships a **first-person** rig (camera on the player body). Movement is
 first-person and **casting aims forward** from the camera (where you look) — keep the aim
 output simple (a forward raycast / muzzle spawn point), no ground-cursor in the slice.
 
-The legacy controller also carries a climbing/parkour camera path that is **being cut**
-(roadmap item 1). The player movement-controller decision (`RigidBody3D` vs
-`CharacterBody3D`) is open but does not change the first-person camera.
+The climbing/parkour camera path has been **removed**. The player movement-controller
+decision (`RigidBody3D` vs `CharacterBody3D`) is open but does not change the first-person
+camera.
 
 ### Spell System — BLEND (decided, the combat core)
 
@@ -278,36 +277,41 @@ components/
   health_component.gd/.tscn   — max_health (export), current_health, damage(int), died signal.
                                 Default max_health → 100 (slice) so friendly fire is funny,
                                 not instant-death. Reused by players and enemies.
-  stamina_component.gd/.tscn   — Two-pool resource + `depleted` signal. PARKOUR IS CUT;
-                                repurpose-or-remove — candidate mana pool (deferred).
+  stamina_component.gd/.tscn   — Two-pool resource + `depleted` signal. PARKOUR IS CUT and
+                                this is OFF the player now; files kept, unused — reserved for
+                                a future mana pool.
   player_input_synchronizer_component.gd/.tscn
                               — Extends MultiplayerSynchronizer. Gathers input on the
-                                authority peer, replicates it (mode 2). Synced fields being
-                                re-pointed to action slots (move, jump, cast, interact).
+                                authority peer, replicates it (mode 2). Syncs `movement_vector`
+                                (WASD) + `is_jump_pressed`. Cast is RPC-driven (not synced);
+                                interact is roadmap.
 
 entities/
   player/
-    player.gd                 — LEGACY first-person RigidBody3D with climbing/parkour.
-                                Slice: climbing disabled, LMB → cast. Controller model
-                                (RigidBody3D vs CharacterBody3D) is an open decision.
+    player.gd                 — First-person RigidBody3D controller: run / jump / look /
+                                cast / death-state. Climbing/parkour removed. Controller
+                                model (RigidBody3D vs CharacterBody3D) is an open decision.
     player.tscn               — FP body, InputSync, MultiplayerSynchronizer, HealthComponent,
-                                mesh + capsule collider, NameLabel, camera, WandComponent.
-  projectiles/                — (new) spell projectile/effect scenes, host-spawned.
-  enemies/                    — (new) EnemyBase (CharacterBody3D + HealthComponent + host AI).
-  pickups/                    — (new) Form/Element spell pickups (interact-to-swap).
+                                mesh + capsule collider, NameLabel, GroundCheck, camera.
+                                (WandComponent is added in code, not in the scene.)
+  projectiles/                — projectile.gd/.tscn: host-spawned + host-resolved spell
+                                projectile (Area3D). BUILT.
+  enemies/                    — (roadmap — not built) EnemyBase (CharacterBody3D + Health + AI).
+  pickups/                    — (roadmap — not built) Form/Element spell pickups (interact-to-swap).
 
 systems/
-  spells/                     — (new) Spell/SpellForm/SpellElement resources + WandComponent.
-  reactions/                  — (new) reaction table + Area3D reactive world volumes.
-  director/                   — (new) host-side wave spawner (timer + escalating count).
+  spells/                     — Spell/SpellForm/SpellElement/BlendSpell resources +
+                                WandComponent. BUILT.
+  reactions/                  — (roadmap — not built) reaction table + Area3D reactive volumes.
+  director/                   — (roadmap — not built) host-side wave spawner (timer + waves).
 
 resources/
   game_config.gd              — Resource. max_players, round_timer, respawn_time. Not an autoload.
 
 ui/
   main_menu/                  — Host/join flow. Validates name, parses IP:port (default 127.0.0.1:3000).
-  hud/                        — DEV debug HUD (CanvasLayer). Slice adds a current-spell
-                                (Form+Element) readout + a proximity swap prompt.
+  hud/                        — DEV debug HUD (CanvasLayer): current-spell + HP readout,
+                                crosshair, death fade overlay. (Proximity swap prompt is roadmap.)
 
 debug/
   debug.gd                    — Dev-only autostart helper. DEBUG autoload, DISABLED by default.
@@ -315,8 +319,8 @@ debug/
 main.gd                       — MultiplayerSpawner setup, peer_ready RPC, spawn_function.
 main.tscn                     — World root: MultiplayerSpawner + a level instance.
 test_level.tscn               — Dev sandbox arena (CSG). Now a movement/combat sandbox.
-project.godot                 — Autoloads, input map, Jolt, 1920×1080, D3D12. NOTE: config_name
-                                still "Friend Slop Framework" — rename to "Magick With Friends".
+project.godot                 — Autoloads, input map (move_*, cast, jump), Jolt, 1920×1080,
+                                D3D12. config_name = "Magick With Friends".
 ```
 
 ---
@@ -343,9 +347,9 @@ The reusable spine that is real and working today:
 - [x] **DEBUG autoload** — disabled-by-default two-window autostart (see below)
 - [x] Two-player local multiplayer verified — host and client see each other move (first-person)
 
-> The first-person movement currently runs through the **legacy `RigidBody3D` controller**
-> (with a climbing/parkour system). That climbing/parkour is **being cut**; the first-person
-> movement itself is **kept** for the slice (the slice tests spells, not locomotion).
+> The first-person movement runs through a **`RigidBody3D` controller**. The old
+> climbing/parkour system has been **removed** — it's now a clean run/jump/look/cast
+> controller. (RigidBody3D-vs-CharacterBody3D is still an open decision.)
 
 ---
 
@@ -391,12 +395,13 @@ play and answers "is the core fun?" Built on the existing co-op framework, **one
 PR**, legibility baked into each PR (not deferred). Everything is host-authoritative and
 reuses the `MultiplayerSpawner` / RPC / `GameEvents` patterns.
 
-1. **Player FP controller cleanup.** Disable climbing/parkour; repurpose `grab` (LMB) →
-   `cast`. Keep the first-person movement. (RigidBody3D-vs-CharacterBody3D decided later.)
-2. **Blend spell core + friendly fire + respawn.** `Spell`/`SpellForm`/`SpellElement`
-   resources, `WandComponent` (Form+Element slots, `cast_delay`), Projectile + Fire,
-   host-authoritative projectile spawn, FF damage on `HealthComponent` (default → 100),
-   immediate local cosmetic cast feedback, current-spell HUD, cheap respawn.
+1. **Player FP controller cleanup.** ✅ DONE — climbing/parkour removed, LMB → cast,
+   first-person run/jump kept. (RigidBody3D-vs-CharacterBody3D still open.)
+2. **Blend spell core + friendly fire + respawn.** ✅ DONE — `Spell`/`SpellForm`/
+   `SpellElement`/`BlendSpell` + `WandComponent` (Form+Element slots, `cast_delay`),
+   Projectile + Fire, host-authoritative projectile spawn, FF damage on `HealthComponent`
+   (default 100), local cosmetic cast feedback, current-spell HUD, cheap respawn with a
+   death fade. Validated two-window.
 3. **Enemies + wave spawner.** `EnemyBase` (CharacterBody3D, host AI: steer to nearest
    player + melee); `systems/director/` timer spawner with escalating waves.
 4. **Blend matrix + reactions + world volumes.** AoE burst + Lightning; reaction table
@@ -417,7 +422,6 @@ Beyond the slice (only if it proves fun):
   call `set_multiplayer_authority`; fine for same-machine, needs fixing for real MP).
 - **Velocity sync** for smoother client interpolation.
 - **More Forms/Elements**, modifiers (constrained), mana resource, downed/revive.
-- **Project cleanup:** rename `application/config_name` to "Magick With Friends".
 
 ---
 
@@ -480,9 +484,9 @@ local cosmetic feedback (muzzle flash), decoupled from host-authoritative resolu
 
 ## Known Issues / Watch Out For
 
-- **Player controller is legacy.** `player.gd` is still the first-person `RigidBody3D`
-  parkour controller. The slice disables climbing and repoints LMB → cast; treat the
-  movement/climbing code as scheduled for cleanup, not a pattern to extend.
+- **Player controller is `RigidBody3D` (first-person).** Climbing/parkour has been removed;
+  it's now a clean run/jump/look/cast controller. The RigidBody3D-vs-CharacterBody3D
+  decision is still open — don't assume one when writing player-agnostic code.
 - **Cast feel is host-asymmetric.** Pure host-authority means the host feels instant casts
   and clients eat a round-trip. Use the local cosmetic muzzle flash, and read playtests
   knowing host feel ≠ client feel (rotate who hosts).
@@ -496,7 +500,6 @@ local cosmetic feedback (muzzle flash), decoupled from host-authoritative resolu
 - `multiplayer.connected_to_server` is only wired for the client path; the host transitions
   immediately — correct, don't add host-side handling.
 - `class_name Player` must stay — `main.gd`'s `spawn_function` casts to `Player`.
-- `project.godot` still names the app "Friend Slop Framework" (rename pending).
 
 ---
 
