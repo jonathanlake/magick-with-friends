@@ -1,9 +1,10 @@
 # DESIGN.md — Magick With Friends
 
-The *what* and *why* of the game: vision, the locked design decisions, the build roadmap,
-and parked future ideas. For *how the code is structured and how to work on it*, see
-`CLAUDE.md`. The blow-by-blow rationale lives in the design transcript / plan; the locked
-decisions are recorded here — treat them as settled unless told otherwise.
+DESIGN is **decision-led**: vision, the locked design decisions, the build roadmap, and parked
+ideas. `CLAUDE.md` is **structure-led** (how the code is organized + the dev workflow). Expect
+some overlap — when a fact appears in both, the *decision* lives here and the *implementation
+detail* lives in `CLAUDE.md`. The blow-by-blow rationale lives in the design transcript / plan;
+the decisions here are settled unless told otherwise.
 
 ---
 
@@ -13,6 +14,12 @@ decisions are recorded here — treat them as settled unless told otherwise.
 **close friend groups** (not public matchmaking). Tone is **"friend slop"** — chaotic fun,
 friendly-fire laughs, happy accidents, jank-as-charm. It is explicitly **NOT** a
 balance-tight, optimal-build competitive game.
+
+> **⚠ Online status (vision vs reality):** the identity is *online* co-op. Real cross-machine
+> play worked on the **predecessor** framework (via external relay / port-forwarding). On
+> **this** codebase only **same-machine two-window** is verified — real online still needs the
+> client-authority-propagation fix + a cross-machine re-test (named roadmap milestone below).
+> Don't claim "online verified" until that's done.
 
 - **Core loop:** 2–4 players fight escalating hordes together in first-person.
   **Friendly fire is ON and is a design pillar** — it's the comedy engine, not a footnote.
@@ -28,6 +35,11 @@ balance-tight, optimal-build competitive game.
   hindsight.** "My fireball ricocheted into Dave" = good; "everyone took damage, nobody
   knows why" = bad. Readable telegraphs, distinct per-element VFX, and readable reactions
   are a **priority, not polish-later.**
+  - **Acceptance bar (how we know it passes):** after any death, the victim can **name what
+    killed them** — which element/form, and for friendly fire *whose* — within a couple
+    seconds, **unprompted**. We ask this explicitly in the playtest. Per effect the bar is:
+    a distinct color + a pre-impact telegraph + a readable reaction. (A playtest question,
+    not telemetry — staying cheap.)
 
 **Influences:** the co-op horde lineage (**Left 4 Dead / Vermintide / Helldivers 2**) for
 the format and the friendly-fire chaos; **Noita** for the wand-building *feel* (the blend,
@@ -83,10 +95,14 @@ reuses the `MultiplayerSpawner` / RPC / `GameEvents` patterns.
 4. **Blend matrix + reactions + world volumes.** AoE burst + Lightning; reaction table
    (lightning chain incl. allies, fire burn-spread); 1–2 `Area3D` reactive volumes (oil,
    water). Distinct per-element VFX as a done-criterion.
-5. **Wild-cascade A/B (hardcoded).** 2–3 authored `CascadeSpell`s (split → chain → explode)
-   via the `Spell.cast()` seam + a `GameConfig.spell_mode = BLEND | CASCADE` toggle, so the
-   playtest compares world-sourced (blend) vs spell-sourced (cascade) chaos. No generative
-   engine.
+5. **Wild-cascade A/B (hardcoded) — a *flavor* probe, NOT an engine bake-off.** Blend is the
+   **decided engine** (Form × Element, one fused cast) and this A/B cannot move that. Its only
+   question: do players want chaos sourced more from the **world** (reactions/physics — blend's
+   default) or from the **spell** (internal cascades)? — which informs *modifier/content*
+   direction later, not the engine. 2–3 authored `CascadeSpell`s (split → chain → explode) via
+   the `Spell.cast()` seam + a `GameConfig.spell_mode = BLEND | CASCADE` toggle, no generative
+   engine. (The 3 hand-authored cascades aren't a fair proxy for cascade-*as-a-system* — fine,
+   because we're sensing flavor preference, not picking an engine.)
 6. **Random keep-or-swap acquisition.** Enemy-dropped Form/Element pickups; `interact`
    action; interact-to-swap that drops the old spell as a re-grabbable pickup.
 7. **Legibility tightening pass**, then the 30-minute friend playtest (run as the A/B).
@@ -97,8 +113,10 @@ Beyond the slice (only if it proves fun):
 - **Run / meta structure** beyond wave-survival.
 - **Production HUD** (health/shield, current spell, wave/timer).
 - **Spawn point system** (4–8 points, by player index).
-- **Client-side authority propagation** (`spawn_function` runs on host only — clients never
-  call `set_multiplayer_authority`; fine for same-machine, needs fixing for real MP).
+- **Re-verify real online MP (named milestone).** `spawn_function` runs host-only, so clients
+  never call `set_multiplayer_authority` on their copy — fine same-machine (all peers read as
+  peer 1), broken cross-machine. Real online worked on the predecessor (external relay); here it
+  needs this client-authority fix **+ an actual cross-machine test** before "online" is claimed.
 - **Velocity sync** for smoother client interpolation.
 - **More Forms/Elements**, modifiers (constrained), mana resource, downed/revive.
 
@@ -110,7 +128,7 @@ Beyond the slice (only if it proves fun):
   NOT a per-pixel falling-sand sim. Full simulation (fire spreading per-pixel, liquids,
   electrified water at sim fidelity) is expensive and hard to net-replicate in 3D — stay with
   tagged volumes / area triggers until there's a reason not to.
-- **Authority model** — already decided (see Open design decisions); formalize the
+- **Authority model** — already decided (see Design decisions); formalize the
   per-player-self / host-shared split in code when building past the slice.
 - **Mana resource** — repurpose `StaminaComponent` if cooldowns prove too shallow.
 - **Run / meta structure** — stages, between-run progression, objectives.
