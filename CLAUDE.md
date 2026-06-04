@@ -394,6 +394,12 @@ feedback (muzzle flash), decoupled from host-authoritative resolution.
 - **Cast feel is host-asymmetric.** The host feels instant casts; clients eat a round-trip. The
   local cosmetic muzzle flash masks it; read playtests knowing host feel ≠ client feel (rotate hosts).
 - **Spawn height vs capsule:** keep spawn markers at `y≈1.0`+ so the capsule doesn't clip the floor.
+- **Collision layers are all on layer 1 (tech debt — TODO).** Players, enemies, projectiles, and
+  world geometry share the default layer 1 / mask 1. The projectile→body hit detection relies on
+  this shared layer, and it's the lowest-risk default for the slice. Side effect: enemies
+  physically shove each other and players. **Cleanup item:** define named layers
+  (world / players / enemies / projectiles) in `project.godot` and set each body's layer/mask
+  explicitly (remember to widen the projectile Area3D mask to include the enemy layer).
 - **`input_multiplayer_authority` on clients:** `spawn_function` runs on the host only, so clients
   never call `set_multiplayer_authority` on their copy. Works for same-machine testing (all peers
   read as peer 1); needs fixing for real multiplayer.
