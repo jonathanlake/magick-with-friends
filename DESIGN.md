@@ -33,21 +33,26 @@ balance-tight, optimal-build competitive game.
 the format and the friendly-fire chaos; **Noita** for the wand-building *feel* (the blend,
 not the per-pixel simulation).
 
-### Open design decisions (DECIDE LATER — do not invent these)
+### Design decisions
 
-- **Player movement controller.** The player ships a **first-person `RigidBody3D`**
-  controller (run / jump / look / cast; climbing/parkour removed). Whether to keep
-  `RigidBody3D` (physics-chaos — ragdolls, knockback, slips — actually *suits* the
-  friend-slop tone) or migrate to `CharacterBody3D` (snappier, more standard) is **open**.
-  **Enemies** are `CharacterBody3D`.
-- **Authority model — DECIDED.** **Per-player authority** over your own character
-  (movement, position, input) for crisp self-feel — each peer simulates its own player and
-  replicates position outward. **Host authority** over damage / health / death / respawn
-  (reliable RPC *value*-sync from `Main`, not a `MultiplayerSynchronizer`) and, net-new,
-  enemies / waves / pickups / world reactions — the interaction layer needs one resolver to
-  stay consistent and *legible*. This matches Godot best practice for trusted friend co-op
-  (peer-owns-input + host-authoritative health via RPC). Client-side movement prediction is
-  **not** used; add only if real-connection playtests show input lag.
+**Decided (do not re-litigate or contradict):**
+
+- **Authority model.** **Per-player authority** over your own character (movement, position,
+  input) for crisp self-feel — each peer simulates its own player and replicates position
+  outward. **Host authority** over damage / health / death / respawn (reliable RPC *value*-sync
+  from `Main`, not a `MultiplayerSynchronizer`) and, net-new, enemies / waves / pickups / world
+  reactions — the interaction layer needs one resolver to stay consistent and *legible*. This
+  matches Godot best practice for trusted friend co-op (peer-owns-input + host-authoritative
+  health via RPC). Client-side movement prediction is **not** used; add only if real-connection
+  playtests show input lag.
+
+**Still open (DECIDE LATER — do not invent these):**
+
+- **Player movement controller.** The player ships a **first-person `RigidBody3D`** controller
+  (run / jump / look / cast; climbing/parkour removed). Whether to keep `RigidBody3D`
+  (physics-chaos — ragdolls, knockback, slips — actually *suits* the friend-slop tone) or
+  migrate to `CharacterBody3D` (snappier, more standard) is **open**. **Enemies** are
+  `CharacterBody3D`.
 - **Run / meta structure** beyond bare wave-survival (stages? mission arc? between-run
   progression?) — **open.** The slice is wave-survival only.
 - **Ability resource.** Per-cast **cooldown** for now; a mana pool (repurpose
