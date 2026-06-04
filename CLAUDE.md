@@ -359,9 +359,19 @@ neither alone is complete (verified empirically):
    "<godot>" --headless --editor --quit --path "<project>"
    ```
    **Fail on `SCRIPT ERROR` / `Parse Error` / `Failed to load`** in its output.
+3. **Gameplay boot smoke test** — confirms the project not only *loads* but *runs*: boots a
+   headless **host** into the actual game (`Main`, host player spawned) and fails on any
+   logged runtime error. Catches `_ready` / spawn / boot errors the load-checks miss, plus
+   host-driven systems that run without input (e.g. the enemy/wave director).
+   ```
+   bash tools/smoke-test.sh
+   ```
+   It enables the DEBUG autoload for the run (restored on exit), drives `debug.gd`'s `smoke`
+   path, and prints `SMOKE: PASS` / `FAIL` (exit 0/1). **Host-driven only** — it does **not**
+   exercise input (casting/movement); that stays with the two-window playtest.
 
-Together these catch the "won't parse / won't load" bugs a no-Godot session would ship blind.
-This is the cheap gate **before** the two-window playtest — not a replacement for it.
+Together these catch the "won't parse / won't load / won't boot" bugs a no-Godot session would
+ship blind. They are the cheap gate **before** the two-window playtest — not a replacement.
 
 ---
 

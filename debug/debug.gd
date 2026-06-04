@@ -5,6 +5,13 @@ var _main_scene: PackedScene = preload("uid://dxjewv468c6y2")
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
+
+	# Headless gameplay smoke test (Tier 1): `-- smoke`. Boots a host into Main, verifies
+	# the host player spawned, prints a PASS/FAIL marker, and quits. See tools/smoke-test.sh.
+	if "smoke" in args:
+		_run_smoke()
+		return
+
 	if not "debug_autostart" in args:
 		return
 	if not ("host" in args or "join" in args):
@@ -27,3 +34,23 @@ func _ready() -> void:
 		GameManager.player_name = "CLIENT"
 		# main_menu._on_connection_succeeded handles the scene transition.
 		NetworkManager.join_game("127.0.0.1")
+
+
+# Host headless, load Main, wait a few frames, and assert the host player spawned.
+# Frame-based (not wall-clock) so it's deterministic under headless. Quits with code
+# 0 on success, 1 on failure; the `SMOKE_OK` / `SMOKE_FAIL` print is the harness's signal.
+func _run_smoke() -> void:
+	await get_tree().process_frame
+	GameManager.player_name = "SMOKE_HOST"
+	NetworkManager.host_game()
+	get_tree().change_scene_to_packed(_main_scene)
+	for _i in 30:
+		await get_tree().process_frame
+	var main := get_tree().current_scene
+	var player: Node = main.get_node_or_null(str(multiplayer.get_unique_id())) if main else null
+	if player != null:
+		print("SMOKE_OK: host booted into Main, player spawned")
+		get_tree().quit(0)
+	else:
+		print("SMOKE_FAIL: host player not found after boot")
+		get_tree().quit(1)
