@@ -47,10 +47,17 @@ func _run_smoke() -> void:
 	for _i in 30:
 		await get_tree().process_frame
 	var main := get_tree().current_scene
-	var player: Node = main.get_node_or_null(str(multiplayer.get_unique_id())) if main else null
+	var pid := str(multiplayer.get_unique_id())
+	var player: Node = main.get_node_or_null(pid) if main else null
+	# Print evidence read LIVE from the running scene tree (not fixed strings), so a PASS is
+	# self-verifying: the loaded scene's name, the host player's real node path, and that its
+	# components are wired (WandComponent is added in code; HealthComponent comes from the scene).
 	if player != null:
-		print("SMOKE_OK: host booted into Main, player spawned")
+		print("SMOKE_OK: scene='%s' | host player '%s' is live | WandComponent=%s HealthComponent=%s | is_server=%s" % [
+			main.name, player.get_path(), player.has_node("WandComponent"),
+			player.has_node("HealthComponent"), multiplayer.is_server()])
 		get_tree().quit(0)
 	else:
-		print("SMOKE_FAIL: host player not found after boot")
+		print("SMOKE_FAIL: scene='%s', no host player node named '%s' in the tree" % [
+			(main.name if main else "<none>"), pid])
 		get_tree().quit(1)
