@@ -2,9 +2,10 @@
 
 Architecture reference for AI-assisted development. Read this before touching any file.
 
-**Game vision, design decisions, build roadmap, and status live in `DESIGN.md`** — read that
-for *what* we're building and *why*. This file is *how the code is structured and how to work
-on it*: rules, file map, the non-obvious Godot gotchas, and the dev workflow.
+**Game vision, design decisions, build roadmap, and status live in `DESIGN.md`.** DESIGN is
+**decision-led** (what/why); this file is **structure-led** (how the code is organized + the
+dev workflow): rules, file map, the non-obvious Godot gotchas. Expect some overlap — when a fact
+is in both, the *decision* lives in `DESIGN.md` and the *implementation detail* lives here.
 
 In one line: a **3D online co-op, first-person, horde** game; combat is the **BLEND spell
 system** (Form × Element → one fused cast). It began as a generic multiplayer "friend slop"
@@ -37,9 +38,10 @@ Where this doc describes a system the code doesn't implement yet, it's marked ro
 - **No C# toolchain.** No `.csproj`, no `dotnet`, no NuGet.
 - **Do not modify UIDs** in `.tscn` or `.gd.uid` files manually (the editor generates them).
 - **@export everything tunable.** Any value a non-coder might want to change must be `@export`.
-- **Enemies are `CharacterBody3D`** (kinematic, `move_and_slide`-driven). The **player** is a
-  first-person `RigidBody3D` — physics-chaos (ragdolls, knockback, slips) is a *feature* of the
-  friend-slop tone. (RigidBody3D-vs-CharacterBody3D is an open decision; see `DESIGN.md`.)
+- **Enemies are `CharacterBody3D`** (kinematic, `move_and_slide`-driven). **Physics-chaos —
+  ragdolls, knockback, slips — is the embraced tone**, so `RigidBody3D` is fine for players and
+  props. (The player's controller — `RigidBody3D` today — is a *current default, open to change*,
+  not a fixed rule; see `DESIGN.md`.)
 - **Component pattern.** Behavior goes in component nodes, not monolithic scripts.
 - **Event bus pattern.** Cross-system communication goes through `GameEvents` signals.
   No direct node references across unrelated systems.
@@ -65,8 +67,9 @@ comment; read it before adding any connection code.
 
 ### Multiplayer Model
 
-ENet host/client. One player is the server (host, peer ID `1`); others are clients. **This is
-the single source of truth for the authority model** — other sections defer here.
+ENet host/client. One player is the server (host, peer ID `1`); others are clients. This is the
+**implementation home for the authority model decided in `DESIGN.md`** — other sections defer
+here for the *how*.
 
 - **Input authority:** Each player is `multiplayer_authority` over their own `Player` node and
   `PlayerInputSynchronizerComponent`. Input is gathered locally only on the authority peer,
@@ -165,7 +168,7 @@ see `DESIGN.md` for the blend rationale and the legibility north star):
 
 Implemented as `@export`-driven Resources under `systems/spells/` (`Spell` / `SpellForm` /
 `SpellElement` / `BlendSpell`), cast by a `WandComponent` on the player holding the
-`(Form, Element)` pair and enforcing `cast_delay`. `Spell` exposes a `cast_on_host()` seam so
+`(Form, Element)` pair and enforcing `cast_delay_sec`. `Spell` exposes a `cast_on_host()` seam so
 an authored `CascadeSpell` (the roadmap A/B) slots in without reworking the wand.
 
 **Host-authoritative** (see Multiplayer Model): casts originate on the authority peer; the host
@@ -258,6 +261,11 @@ The reusable spine that is real and working today:
 - [x] **DEBUG autoload** — disabled-by-default two-window autostart (see below)
 - [x] Two-player local multiplayer verified — host + client see each other move (first-person)
 - [x] **Blend casting + friendly fire + death/respawn** — built and validated two-window
+
+> **Online status:** the *vision* is online co-op, and real cross-machine play worked on the
+> **predecessor** framework (external relay / port-forwarding). On **this** codebase only
+> **same-machine two-window** is verified — real online needs the client-authority-propagation
+> fix (see Known Issues) + a cross-machine re-test (see the `DESIGN.md` roadmap milestone).
 
 ---
 
