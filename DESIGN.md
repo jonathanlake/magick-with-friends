@@ -86,7 +86,7 @@ reuses the `MultiplayerSpawner` / RPC / `GameEvents` patterns.
 1. **Player FP controller cleanup.** ✅ DONE — climbing/parkour removed, LMB → cast,
    first-person run/jump kept. (RigidBody3D-vs-CharacterBody3D still open.)
 2. **Blend spell core + friendly fire + respawn.** ✅ DONE — `Spell`/`SpellForm`/
-   `SpellElement`/`BlendSpell` + `WandComponent` (Form+Element slots, `cast_delay`),
+   `SpellElement`/`BlendSpell` + `WandComponent` (Form+Element slots, `cast_delay_sec`),
    Projectile + Fire, host-authoritative projectile spawn, FF damage on `HealthComponent`
    (default 100), local cosmetic cast feedback, current-spell HUD, cheap respawn with a
    death fade. Validated two-window.
@@ -100,7 +100,7 @@ reuses the `MultiplayerSpawner` / RPC / `GameEvents` patterns.
    question: do players want chaos sourced more from the **world** (reactions/physics — blend's
    default) or from the **spell** (internal cascades)? — which informs *modifier/content*
    direction later, not the engine. 2–3 authored `CascadeSpell`s (split → chain → explode) via
-   the `Spell.cast()` seam + a `GameConfig.spell_mode = BLEND | CASCADE` toggle, no generative
+   the `Spell.cast_on_host()` seam + a `GameConfig.spell_mode = BLEND | CASCADE` toggle, no generative
    engine. (The 3 hand-authored cascades aren't a fair proxy for cascade-*as-a-system* — fine,
    because we're sensing flavor preference, not picking an engine.)
 6. **Random keep-or-swap acquisition.** Enemy-dropped Form/Element pickups; `interact`
