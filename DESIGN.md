@@ -90,8 +90,13 @@ reuses the `MultiplayerSpawner` / RPC / `GameEvents` patterns.
    Projectile + Fire, host-authoritative projectile spawn, FF damage on `HealthComponent`
    (default 100), local cosmetic cast feedback, current-spell HUD, cheap respawn with a
    death fade. Validated two-window.
-3. **Enemies + wave spawner.** `EnemyBase` (CharacterBody3D, host AI: steer to nearest
-   player + melee); `systems/director/` timer spawner with escalating waves.
+3. **Enemies + wave spawner.** ✅ BUILT — headless-validated; two-window playtest pending.
+   `EnemyBase` (CharacterBody3D + `HealthComponent`, host AI: gravity + steer to nearest alive
+   player + cooldown'd melee routed through `apply_player_damage`), replicated host→clients via
+   a `MultiplayerSynchronizer`; `systems/director/wave_director.gd` is a host-only escalating
+   ring spawner feeding a 3rd `MultiplayerSpawner`. Spells already kill enemies via the existing
+   projectile→`HealthComponent` path. Arena flattened to a walled horde box (climbing geometry
+   removed). Collision layers left all-on-1 (tracked as tech debt in `CLAUDE.md`).
 4. **Blend matrix + reactions + world volumes.** AoE burst + Lightning; reaction table
    (lightning chain incl. allies, fire burn-spread); 1–2 `Area3D` reactive volumes (oil,
    water). Distinct per-element VFX as a done-criterion.

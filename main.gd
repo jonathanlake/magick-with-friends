@@ -2,11 +2,13 @@ extends Node
 
 var player_scene: PackedScene = preload("uid://cunquuhctdb1o")
 var _hud_scene: PackedScene = preload("uid://ct7hud5x8kl3n")
-# New asset — referenced by path until the editor assigns a uid.
+# New assets — referenced by path until the editor assigns a uid.
 var projectile_scene: PackedScene = preload("res://entities/projectiles/projectile.tscn")
+var enemy_scene: PackedScene = preload("res://entities/enemies/enemy_base.tscn")
 
 @onready var multiplayer_spawner: MultiplayerSpawner = $MultiplayerSpawner
 @onready var projectile_spawner: MultiplayerSpawner = $ProjectileSpawner
+@onready var enemy_spawner: MultiplayerSpawner = $EnemySpawner
 @onready var player_spawn_position: Marker3D = find_child("PlayerSpawnPosition", true, false)
 
 # Host-only guard so a dead player only queues one respawn.
@@ -29,6 +31,13 @@ func _ready() -> void:
 		var proj := projectile_scene.instantiate() as Projectile
 		proj.setup(data)
 		return proj
+
+	# Same pattern for enemies — runs on every peer; host drives spawns via the WaveDirector.
+	enemy_spawner.spawn_function = func(data):
+		var enemy := enemy_scene.instantiate() as EnemyBase
+		enemy.name = data["name"]
+		enemy.position = data["pos"]
+		return enemy
 
 	if multiplayer.is_server():
 		# Spawn the host's own player immediately — no RPC needed.
@@ -59,6 +68,12 @@ func peer_ready(p_name: String) -> void:
 func spawn_projectile(config: Dictionary) -> void:
 	if multiplayer.is_server():
 		projectile_spawner.spawn(config)
+
+
+## Host-only. Called by the WaveDirector to spawn one replicated enemy.
+func spawn_enemy(config: Dictionary) -> void:
+	if multiplayer.is_server():
+		enemy_spawner.spawn(config)
 
 
 ## Called on the host by a projectile hit. Health is host-authoritative: the host computes
