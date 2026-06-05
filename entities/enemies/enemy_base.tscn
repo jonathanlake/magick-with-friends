@@ -1,7 +1,8 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://entities/enemies/enemy_base.gd" id="1_enemy"]
 [ext_resource type="PackedScene" uid="uid://bsde65brylo0j" path="res://components/health_component.tscn" id="2_health"]
+[ext_resource type="PackedScene" path="res://components/hit_flash_component.tscn" id="3_hitflash"]
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_enemy"]
 radius = 0.4
@@ -39,3 +40,9 @@ max_health = 40
 
 [node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
 replication_config = SubResource("SceneReplicationConfig_enemy")
+
+[node name="HitFlashComponent" parent="." instance=ExtResource("3_hitflash")]
+target_mesh_path = NodePath("../MeshInstance3D")
+health_component_path = NodePath("../HealthComponent")
+flash_color = Color(1, 0.5, 0, 1)
+flash_duration_sec = 0.3
