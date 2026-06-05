@@ -4,6 +4,8 @@ extends CanvasLayer
 @onready var _death_overlay: ColorRect = $DeathOverlay
 @onready var _death_label: Label = $DeathLabel
 @onready var _fps_label: Label = $FpsPanel/FpsLabel
+@onready var _disconnect_overlay: ColorRect = $DisconnectOverlay
+@onready var _disconnect_label: Label = $DisconnectOverlay/DisconnectLabel
 
 var _player: Player = null
 var _was_dead: bool = false
@@ -35,6 +37,13 @@ func _update_readout() -> void:
 	var spell_text: String = wand.current_spell_text() if wand else "?"
 	var hp: int = hc.current_health if hc else 0
 	_debug_label.text = "SPELL =  %s\nHP     %d\n%s" % [spell_text, hp, counts]
+
+
+# Shown when the host leaves. The overlay node is PROCESS_MODE_ALWAYS, so binding the fade tween
+# to it lets it animate even though the caller pauses the tree right after (crash-safe shutdown).
+func show_host_left() -> void:
+	_disconnect_label.visible = true
+	_disconnect_overlay.create_tween().tween_property(_disconnect_overlay, "modulate:a", 1.0, 0.4)
 
 
 # Fades the local player's screen to black on death, back on respawn (cosmetic, local only).
