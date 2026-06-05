@@ -37,6 +37,9 @@ func _enter_tree() -> void:
 
 func _ready() -> void:
 	_name_label.text = player_name
+	# Join the "players" group on every peer so enemy AI can find players via the group
+	# instead of scanning all of Main's children + casting each one every physics frame.
+	add_to_group("players")
 
 	# Wand on every peer's copy (same node path) so RPC cast requests route to the host.
 	_wand = WandComponent.new()
