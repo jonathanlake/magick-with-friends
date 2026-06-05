@@ -134,6 +134,10 @@ func _sync_health(victim_peer: int, value: int) -> void:
 		return
 	var hc := player.get_node_or_null("HealthComponent") as HealthComponent
 	if hc:
+		# Local first-person damage cue: fire only on the victim's own machine when HP actually
+		# dropped (so it won't trigger on respawn/reset, which raise HP).
+		if value < hc.current_health and multiplayer.get_unique_id() == victim_peer:
+			GameEvents.local_player_damaged.emit()
 		hc.current_health = value
 
 

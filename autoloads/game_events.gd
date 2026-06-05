@@ -2,6 +2,9 @@ extends Node
 
 signal enemy_died
 signal enemy_count_changed(count: int)
+## Local-only UI cue: the LOCAL player's HP just dropped (host-confirmed). Fired only on the
+## victim's own machine. Drives the first-person damage screen-flash; audio/rumble can hook in too.
+signal local_player_damaged
 
 # Host-and-client-consistent live enemy count. Enemies register/unregister themselves on every peer
 # (MultiplayerSpawner spawn and queue_free both replicate), so this stays in sync everywhere the HUD
