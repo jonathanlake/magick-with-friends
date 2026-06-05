@@ -134,11 +134,14 @@ func _sync_health(victim_peer: int, value: int) -> void:
 		return
 	var hc := player.get_node_or_null("HealthComponent") as HealthComponent
 	if hc:
-		# Local first-person damage cue: fire only on the victim's own machine when HP actually
-		# dropped (so it won't trigger on respawn/reset, which raise HP).
-		if value < hc.current_health and multiplayer.get_unique_id() == victim_peer:
-			GameEvents.local_player_damaged.emit()
 		hc.current_health = value
+		# Local first-person damage cue. _sync_health is only ever sent on a damage hit (respawn/
+		# reset go through _respawn_player, never here), so fire it on the victim's own machine.
+		# Don't compare value < current_health: the host pre-applies hc.damage() in
+		# apply_player_damage before this runs, so on the host the drop is already baked in — that
+		# asymmetry is exactly why the cue fired on clients but not the host.
+		if multiplayer.get_unique_id() == victim_peer:
+			GameEvents.local_player_damaged.emit()
 
 
 func _on_player_died(victim_peer: int) -> void:
