@@ -42,14 +42,17 @@ func _ready() -> void:
 		NetworkManager.join_game("127.0.0.1")
 
 
-# Move this instance's window to the top-left of the given monitor. If there's only one
-# screen (or the index is invalid), use fallback_pos so the two windows still sit side by side.
+# Move this instance's window onto the given monitor and maximize it there. Maximizing (rather
+# than positioning a native-size window flush to the monitor's top-left, which pushes the Windows
+# title bar off-screen and looks frameless) fills the screen while keeping a usable, movable title
+# bar. Falls back to a simple windowed offset when there's only one screen.
 func _place_window_on_screen(screen: int, fallback_pos: Vector2i) -> void:
 	if DisplayServer.get_screen_count() < 2 or screen < 0 or screen >= DisplayServer.get_screen_count():
 		DisplayServer.window_set_position(fallback_pos)
 		return
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)  # ensure not maximized before moving
 	DisplayServer.window_set_current_screen(screen)
-	DisplayServer.window_set_position(DisplayServer.screen_get_position(screen))
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
 
 
 # Index of the physically leftmost monitor (smallest virtual-desktop x).
