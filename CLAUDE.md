@@ -185,13 +185,19 @@ pickup). Design rationale for all of this lives in `DESIGN.md`.
 ```
 autoloads/
   game_events.gd              — Global signal bus. Add signals here, not in random scripts.
-                                Currently only a leftover `enemy_died` — see DESIGN.md roadmap.
+                                Has `enemy_died`, `enemy_count_changed(count)` + `alive_enemy_count`
+                                (register_enemy/unregister_enemy), and `local_player_damaged` (FP
+                                hit cue). Fuller vocabulary is a DESIGN.md roadmap item.
   game_manager.gd             — Autoload Node. Owns GameConfig + local player_name.
   network_manager.gd          — Transport abstraction. ONLY file that touches ENet/Steam/relay.
 
 components/
   health_component.gd/.tscn   — max_health (export, default 100), current_health, damage(int),
-                                died signal. Reused by players and enemies.
+                                died + damaged signals. Reused by players and enemies.
+  hit_flash_component.gd/.tscn — Reusable damage flash. @export target_mesh_path / flash_color /
+                                flash_duration_sec / health_component_path. Auto-wires to a
+                                HealthComponent's `damaged`; host fans the cosmetic flash to all
+                                peers via an `any_peer` RPC. Used by players + enemies.
   stamina_component.gd/.tscn   — Two-pool resource + `depleted` signal. OFF the player; files
                                 kept, unused — reserved for a future mana pool.
   player_input_synchronizer_component.gd/.tscn
@@ -204,26 +210,29 @@ entities/
     player.gd                 — First-person RigidBody3D controller: run / jump / look /
                                 cast / death-state. Climbing/parkour removed.
     player.tscn               — FP body, InputSync, MultiplayerSynchronizer, HealthComponent,
-                                mesh + capsule collider, NameLabel, GroundCheck, camera.
-                                (WandComponent is added in code, not in the scene.)
+                                HitFlashComponent, mesh (+ local material) + capsule collider,
+                                NameLabel, GroundCheck, camera. (WandComponent is added in code.)
   projectiles/                — projectile.gd/.tscn: host-spawned + host-resolved spell
                                 projectile (Area3D). BUILT.
-  enemies/                    — (roadmap) EnemyBase (CharacterBody3D + Health + AI).
+  enemies/                    — enemy_base.gd/.tscn: EnemyBase (CharacterBody3D + HealthComponent +
+                                HitFlashComponent; host AI: gravity / steer / cooldown'd melee). BUILT.
   pickups/                    — (roadmap) Form/Element spell pickups (interact-to-swap).
 
 systems/
   spells/                     — Spell/SpellForm/SpellElement/BlendSpell resources +
                                 WandComponent. BUILT.
   reactions/                  — (roadmap) reaction table + Area3D reactive volumes.
-  director/                   — (roadmap) host-side wave spawner (timer + waves).
+  director/                   — wave_director.gd: host-side escalating ring spawner (timer + waves,
+                                alive cap). BUILT.
 
 resources/
   game_config.gd              — Resource. max_players, respawn_time. Not an autoload.
 
 ui/
   main_menu/                  — Host/join flow. Validates name, parses IP:port (default 127.0.0.1:3000).
-  hud/                        — DEV debug HUD (CanvasLayer): current-spell + HP readout,
-                                crosshair, death fade overlay. (Proximity swap prompt is roadmap.)
+  hud/                        — DEV debug HUD (CanvasLayer): spell + HP + enemy/player counts + FPS
+                                readout, crosshair, death fade, host-left + self-damage overlays.
+                                (Proximity swap prompt is roadmap.)
 
 debug/
   debug.gd                    — Dev-only helper. DEBUG autoload, DISABLED by default. Two-window
@@ -232,10 +241,12 @@ debug/
 tools/
   smoke-test.sh               — Headless gameplay smoke test (see Headless Validation).
 
-main.gd                       — MultiplayerSpawner setup, peer_ready RPC, spawn_function, damage/
-                                death/respawn RPCs, projectile spawner.
-main.tscn                     — World root: player + projectile MultiplayerSpawners + a level.
-test_level.tscn               — Dev sandbox arena (CSG). Movement/combat sandbox.
+main.gd                       — Spawner setup (player/projectile/enemy), peer_ready RPC,
+                                spawn_functions, host damage/death/respawn RPCs + self-damage cue,
+                                HUD + host-only console mount, host-disconnect handling.
+main.tscn                     — World root: player/projectile/enemy MultiplayerSpawners,
+                                Projectiles/Enemies containers, WaveDirector, + a level.
+test_level.tscn               — Walled horde arena (CSG floor + 4 perimeter walls). Combat sandbox.
 project.godot                 — Autoloads, input map (move_*, cast, jump), Jolt, 1920×1080,
                                 D3D12. config_name = "Magick With Friends".
 ```
@@ -255,7 +266,7 @@ The reusable spine that is real and working today:
       max_players gate; despawn on disconnect; `MultiplayerSpawner` `spawn_function`
 - [x] `PlayerInputSynchronizerComponent` (mode 2 input) + player `MultiplayerSynchronizer`
       (`global_position`, mode 1, spawn=true)
-- [x] `HealthComponent` / `GameConfig` / `GameManager` / `GameEvents` (stub) autoloads + components
+- [x] `HealthComponent` / `GameConfig` / `GameManager` / `GameEvents` autoloads + components
 - [x] **IP input field** + name validation in the main menu (falls back to `127.0.0.1:3000`)
 - [x] Floating name labels over players; placeholder capsule meshes
 - [x] **DEBUG autoload** — disabled-by-default two-window autostart (see below)
@@ -264,8 +275,9 @@ The reusable spine that is real and working today:
 
 > **Online status:** the *vision* is online co-op, and real cross-machine play worked on the
 > **predecessor** framework (external relay / port-forwarding). On **this** codebase only
-> **same-machine two-window** is verified — real online needs the client-authority-propagation
-> fix (see Known Issues) + a cross-machine re-test (see the `DESIGN.md` roadmap milestone).
+> **same-machine two-window** is verified. Per-peer authority *does* propagate (verified — see
+> Known Issues); the remaining gap is a **cross-machine transport** re-test (NAT / relay / latency),
+> not an authority fix (see the `DESIGN.md` roadmap milestone).
 
 ---
 
