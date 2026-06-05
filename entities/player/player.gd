@@ -1,8 +1,11 @@
 class_name Player
 extends RigidBody3D
 
-@export var move_force: float = 40.0
-@export var max_speed: float = 8.0
+# friction-terminal speed = move_force / ground_friction = 15 u/s, above max_speed, so max_speed
+# is the real binding cap (reached snappily). ~12 u/s ≈ the prior feel and ~3× the 4 u/s enemy
+# speed, so players can kite the horde.
+@export var move_force: float = 120.0
+@export var max_speed: float = 12.0
 @export var ground_friction: float = 8.0
 @export var jump_force: float = 7.0
 @export var jump_gravity_multiplier: float = 2.5   # extra gravity while rising
