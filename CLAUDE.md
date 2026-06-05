@@ -286,7 +286,9 @@ prefix, so it is **disabled by default**. It never runs in normal play or export
    | 2 (Client) | `-- join debug_autostart` |
 
    The `--` separator is required — everything after it is read via `OS.get_cmdline_user_args()`.
-3. **Hit Play (F5).** Both windows launch. Host titles itself `HOST`, client `CLIENT`.
+   Role keywords accept aliases: `host`/`server` and `join`/`client` are interchangeable.
+3. **Hit Play (F5).** Both windows launch. Host titles itself `HOST`, client `CLIENT`. The host
+   opens on the leftmost monitor, the client on the primary monitor (single-screen = side-by-side).
 
 ### Disabling before shipping / returning to normal play
 

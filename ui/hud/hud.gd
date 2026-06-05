@@ -3,6 +3,7 @@ extends CanvasLayer
 @onready var _debug_label: Label = $DebugPanel/MarginContainer/VBoxContainer/DebugLabel
 @onready var _death_overlay: ColorRect = $DeathOverlay
 @onready var _death_label: Label = $DeathLabel
+@onready var _fps_label: Label = $FpsPanel/FpsLabel
 
 var _player: Player = null
 var _was_dead: bool = false
@@ -13,6 +14,7 @@ func _process(_delta: float) -> void:
 		var peer_id := str(multiplayer.get_unique_id())
 		_player = get_parent().get_node_or_null(peer_id) as Player
 
+	_fps_label.text = "FPS %d" % int(Engine.get_frames_per_second())
 	_update_readout()
 	_update_death_feedback()
 
@@ -32,7 +34,7 @@ func _update_readout() -> void:
 	var hc := _player.get_node_or_null("HealthComponent") as HealthComponent
 	var spell_text: String = wand.current_spell_text() if wand else "?"
 	var hp: int = hc.current_health if hc else 0
-	_debug_label.text = "SPELL  %s\nHP     %d\n%s" % [spell_text, hp, counts]
+	_debug_label.text = "SPELL =  %s\nHP     %d\n%s" % [spell_text, hp, counts]
 
 
 # Fades the local player's screen to black on death, back on respawn (cosmetic, local only).

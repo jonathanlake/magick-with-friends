@@ -14,7 +14,11 @@ func _ready() -> void:
 
 	if not "debug_autostart" in args:
 		return
-	if not ("host" in args or "join" in args):
+	# Role keyword: "host"/"server" start the host, "join"/"client" connect to it. The aliases
+	# exist so the intuitive word (matching the HOST/CLIENT window titles) just works too.
+	var is_host := "host" in args or "server" in args
+	var is_client := "join" in args or "client" in args
+	if not (is_host or is_client):
 		return
 
 	# Autoloads initialize before the main scene loads, and Godot sets its own
@@ -22,18 +26,42 @@ func _ready() -> void:
 	# and the window title are fully settled before we act.
 	await get_tree().process_frame
 
-	if "host" in args:
+	if is_host:
 		DisplayServer.window_set_title("HOST")
-		DisplayServer.window_set_position(Vector2i(0, 0))
+		# Host on the LEFT monitor; falls back to the top-left of a single screen.
+		_place_window_on_screen(_leftmost_screen(), Vector2i(0, 0))
 		GameManager.player_name = "HOST"
 		NetworkManager.host_game()
 		get_tree().change_scene_to_packed(_main_scene)
-	elif "join" in args:
+	elif is_client:
 		DisplayServer.window_set_title("CLIENT")
-		DisplayServer.window_set_position(Vector2i(960, 0))
+		# Client on the MAIN (primary) monitor; falls back to a right-offset on a single screen.
+		_place_window_on_screen(DisplayServer.get_primary_screen(), Vector2i(960, 0))
 		GameManager.player_name = "CLIENT"
 		# main_menu._on_connection_succeeded handles the scene transition.
 		NetworkManager.join_game("127.0.0.1")
+
+
+# Move this instance's window onto the given monitor and maximize it there. Maximizing (rather
+# than positioning a native-size window flush to the monitor's top-left, which pushes the Windows
+# title bar off-screen and looks frameless) fills the screen while keeping a usable, movable title
+# bar. Falls back to a simple windowed offset when there's only one screen.
+func _place_window_on_screen(screen: int, fallback_pos: Vector2i) -> void:
+	if DisplayServer.get_screen_count() < 2 or screen < 0 or screen >= DisplayServer.get_screen_count():
+		DisplayServer.window_set_position(fallback_pos)
+		return
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)  # ensure not maximized before moving
+	DisplayServer.window_set_current_screen(screen)
+	DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_MAXIMIZED)
+
+
+# Index of the physically leftmost monitor (smallest virtual-desktop x).
+func _leftmost_screen() -> int:
+	var best := 0
+	for i in DisplayServer.get_screen_count():
+		if DisplayServer.screen_get_position(i).x < DisplayServer.screen_get_position(best).x:
+			best = i
+	return best
 
 
 # Host headless, load Main, wait a few frames, and assert the host player spawned.
