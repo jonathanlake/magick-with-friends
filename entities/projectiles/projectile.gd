@@ -48,12 +48,12 @@ func _on_body_entered(body: Node) -> void:
 	if not is_multiplayer_authority():
 		return
 	# Don't blow yourself up at the muzzle.
-	if body is Player and str(body.name) == str(_owner_peer):
+	if body is Player and body.peer_id == _owner_peer:
 		return
 	var arena := get_tree().current_scene
 	if body is Player:
 		if arena.has_method("apply_player_damage"):
-			arena.apply_player_damage(int(str(body.name)), _damage)  # friendly fire ON
+			arena.apply_player_damage(body.peer_id, _damage)  # friendly fire ON
 		queue_free()
 	elif body.has_node("HealthComponent"):
 		(body.get_node("HealthComponent") as HealthComponent).damage(_damage)

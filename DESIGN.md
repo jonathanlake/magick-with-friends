@@ -98,7 +98,8 @@ reuses the `MultiplayerSpawner` / RPC / `GameEvents` patterns.
    a `MultiplayerSynchronizer`; `systems/director/wave_director.gd` is a host-only escalating
    ring spawner feeding a 3rd `MultiplayerSpawner`. Spells already kill enemies via the existing
    projectile→`HealthComponent` path. Arena flattened to a walled horde box (climbing geometry
-   removed). Collision layers left all-on-1 (tracked as tech debt in `CLAUDE.md`).
+   removed). Collision layers now named + explicit (world / players / enemies / projectiles) — see
+   `CLAUDE.md`.
 4. **Blend matrix + reactions + world volumes.** AoE burst + Lightning; reaction table
    (lightning chain incl. allies, fire burn-spread); 1–2 `Area3D` reactive volumes (oil,
    water). Distinct per-element VFX as a done-criterion.

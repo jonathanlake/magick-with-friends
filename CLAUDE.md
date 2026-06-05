@@ -405,12 +405,16 @@ two hand-rolled `grab_focus` workarounds failed before a doc check found the one
 - **Cast feel is host-asymmetric.** The host feels instant casts; clients eat a round-trip. The
   local cosmetic muzzle flash masks it; read playtests knowing host feel ≠ client feel (rotate hosts).
 - **Spawn height vs capsule:** keep spawn markers at `y≈1.0`+ so the capsule doesn't clip the floor.
-- **Collision layers are all on layer 1 (tech debt — TODO).** Players, enemies, projectiles, and
-  world geometry share the default layer 1 / mask 1. The projectile→body hit detection relies on
-  this shared layer, and it's the lowest-risk default for the slice. Side effect: enemies
-  physically shove each other and players. **Cleanup item:** define named layers
-  (world / players / enemies / projectiles) in `project.godot` and set each body's layer/mask
-  explicitly (remember to widen the projectile Area3D mask to include the enemy layer).
+- **Collision layers (named + explicit).** Four named layers in `project.godot`: `world`=1,
+  `players`=2, `enemies`=3, `projectiles`=4 (bit values 1/2/4/8). Assignments:
+  - **world** (CSG floor + walls): layer=1, mask=0 (static; bodies collide *into* it via their masks).
+  - **player** (`player.tscn` RigidBody3D): layer=2, mask=7 (world+players+enemies — keeps the
+    player↔player and player↔enemy shoving chaos). `GroundCheck` ray is mask=1 (world only).
+  - **enemy** (`enemy_base.tscn` CharacterBody3D): layer=4, mask=7 (world+players+enemies — enemies
+    collide with the arena, players, and each other so they don't stack).
+  - **projectile** (`projectile.tscn` Area3D): layer=8, mask=6 (players+enemies — friendly fire ON,
+    hits both, **ignores world**). It despawns on Player/HealthComponent hits + lifetime, so walls
+    don't stop it (add `world` to the mask + handle it if wall-despawn is ever wanted).
 - **`input_multiplayer_authority` propagation (verified OK — not a bug):** the custom
   `MultiplayerSpawner` `spawn_function` runs on **all peers** (Godot docs: *"called on all peers"*),
   so each client re-runs it with the replicated `data` and sets
