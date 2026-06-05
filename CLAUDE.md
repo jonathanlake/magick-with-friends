@@ -387,6 +387,14 @@ The camera lives on the player body; casting aims forward from it (forward rayca
 spawn). No ground-cursor in the slice. Cast *feel* on clients is immediate local cosmetic
 feedback (muzzle flash), decoupled from host-authoritative resolution.
 
+### Engine Behavior — Check Current Docs First
+For engine/library/API behavior, check the **version-current Godot docs** (or community consensus)
+**before** inventing a workaround. Godot's behavior shifts across minor versions, so stale intuition
+is a real trap. **Treat a failed "this should be trivial" fix as the trigger to research — not to
+add more complexity.** (Concrete example: the dev-console input "losing focus" after Enter wasn't a
+focus bug at all — Godot 4.4 added `LineEdit.keep_editing_on_text_submit` defaulting to `false`;
+two hand-rolled `grab_focus` workarounds failed before a doc check found the one-property fix.)
+
 ---
 
 ## Known Issues / Watch Out For

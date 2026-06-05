@@ -36,3 +36,4 @@ scroll_following = true
 [node name="Input" type="LineEdit" parent="Panel/Margin/VBox"]
 layout_mode = 2
 placeholder_text = "command (try: help)"
+keep_editing_on_text_submit = true
