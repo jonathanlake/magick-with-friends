@@ -12,6 +12,13 @@ system** (Form × Element → one fused cast). It began as a generic multiplayer
 framework; the networking spine carries over, movement/camera/combat are being (re)built.
 Where this doc describes a system the code doesn't implement yet, it's marked roadmap.
 
+**Two layers, on purpose.** Treat the **multiplayer spine** (the `NetworkManager` transport seam,
+host-authoritative model, spawners, `GameEvents`, the component pattern, level-agnostic spawning) as
+reusable, game-agnostic infrastructure; the **spell game** is one thing built on it. When adding
+code, know which layer you're in — keep spine code game-agnostic, keep spell-specifics out of it.
+Near-term the spell game is the focus; long-term this split is what enables the swappable mini-game
+**sandbox direction** (see `DESIGN.md`). The slice still comes first.
+
 ---
 
 ## Git Workflow
