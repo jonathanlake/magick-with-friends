@@ -93,8 +93,14 @@ func _on_died() -> void:
 
 # Host-only: damage() runs on the host, so fan the cosmetic flash out to every peer.
 func _on_damaged() -> void:
-	if is_multiplayer_authority():
-		flash_damage.rpc()
+	if not is_multiplayer_authority():
+		return
+	# HealthComponent emits `damaged` after clamping, so health is already 0 on a lethal hit.
+	# Skip the flash then: _on_died queue_free()s this enemy the same frame, and a reliable RPC
+	# + tween on a node being removed just spams "node not found" on clients.
+	if _health.current_health <= 0:
+		return
+	flash_damage.rpc()
 
 
 @rpc("authority", "call_local", "reliable")
