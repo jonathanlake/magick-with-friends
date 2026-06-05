@@ -15,6 +15,14 @@ the decisions here are settled unless told otherwise.
 friendly-fire laughs, happy accidents, jank-as-charm. It is explicitly **NOT** a
 balance-tight, optimal-build competitive game.
 
+> **Project frame (the bigger picture).** At its core this is a **reusable co-op multiplayer
+> spine** — host/join, the swappable transport seam, the host-authoritative model, spawners +
+> event bus — and *games are built on top of it*. The **spell game described here is the first and
+> current focus**: the near-term job is to prove it's fun with friends before broadening. The
+> longer-term direction — keep the spine constant and let the *level* be the game (the swappable
+> mini-game sandbox in Future Considerations) — is real but **not active**: no second game starts
+> until the slice proves out. Everything below describes the spell game unless it says otherwise.
+
 > **⚠ Online status (vision vs reality):** the identity is *online* co-op, but on **this** codebase
 > only **same-machine two-window** is verified. Per-peer authority **does** propagate correctly — the
 > untested piece is **cross-machine transport** (NAT / relay / latency), not authority. Don't claim
@@ -147,17 +155,15 @@ Beyond the slice (only if it proves fun):
 - **Cloudflare Workers / WebSocket relay** — online play without port forwarding.
 - **Lobby / ready system**, **spectator camera** for dead players, **gamepad** bindings +
   right-stick look.
-- **Multiplayer sandbox / swappable mini-game levels (direction, not committed).** A possible
-  broadening of the project: keep the co-op "friendslop" netcode spine (host/join, the
-  `MultiplayerSpawner` + RPC + host-authoritative model) **constant**, and let the *level* be the
-  game — the current horde spell-caster becomes one level; other levels could be entirely
-  different mini-games sharing the same netcode. The **host picks which level/game** to run, and
-  that choice broadcasts to clients. The architecture is already most of the way there:
+- **Multiplayer sandbox / swappable mini-game levels.** The longer-term broadening introduced in
+  the *Project frame* (top of this doc): keep the netcode spine **constant** and let the *level* be
+  the game — the horde spell-caster becomes one level; other levels could be entirely different
+  mini-games sharing the same netcode, with the **host picking which level/game** to run and
+  broadcasting that choice. **Not active until the spell-game slice proves out.** The architecture
+  is already most of the way there:
   - the level is a **swappable child node** in `main.tscn` (`TestLevel` instance), not hard-wired
     into the game logic;
   - player spawning is **level-agnostic** — `main.gd` finds `PlayerSpawnPosition` via
     `find_child(...)`, so any level with that marker just works;
   - `GameManager`/`GameConfig` + the existing host→client RPC pattern already carry pre-game
     config, so a `selected_level` field + a broadcast RPC slot in cleanly.
-  This is a *direction to keep in mind*, not a scheduled item — the vertical slice (the spell
-  game) still comes first.
