@@ -12,6 +12,7 @@ extends Node
 @export var base_enemies_per_wave: int = 3
 @export var enemies_added_per_wave: int = 2
 @export var spawn_interval_sec: float = 0.4
+@export var max_alive_enemies: int = 5  # hard cap on enemies on screen at once (skip-when-full)
 @export var spawn_ring_radius: float = 9.0
 @export var spawn_height: float = 1.0
 @export var arena_center: Vector3 = Vector3.ZERO
@@ -40,6 +41,10 @@ func _run_waves() -> void:
 
 
 func _spawn_one() -> void:
+	# Skip-when-full: hold total alive enemies at the cap. As they die, spawns refill toward it.
+	var enemies := get_parent().get_node_or_null("Enemies")
+	if enemies and enemies.get_child_count() >= max_alive_enemies:
+		return
 	var angle := randf() * TAU
 	var pos := arena_center + Vector3(cos(angle), 0.0, sin(angle)) * spawn_ring_radius
 	pos.y = spawn_height

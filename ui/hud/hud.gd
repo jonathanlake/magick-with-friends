@@ -18,14 +18,21 @@ func _process(_delta: float) -> void:
 
 
 func _update_readout() -> void:
+	# Counts are computed on every peer (enemies replicate to all; peer list is the same
+	# everywhere) and shown even before the local player resolves.
+	var enemies := get_parent().get_node_or_null("Enemies")
+	var enemy_count: int = enemies.get_child_count() if enemies else 0
+	var player_count: int = multiplayer.get_peers().size() + 1
+	var counts := "ENEMIES %d\nPLAYERS %d" % [enemy_count, player_count]
+
 	if not _player:
-		_debug_label.text = "(no player)"
+		_debug_label.text = "(no player)\n%s" % counts
 		return
 	var wand := _player.get_node_or_null("WandComponent") as WandComponent
 	var hc := _player.get_node_or_null("HealthComponent") as HealthComponent
 	var spell_text: String = wand.current_spell_text() if wand else "?"
 	var hp: int = hc.current_health if hc else 0
-	_debug_label.text = "SPELL  %s\nHP     %d" % [spell_text, hp]
+	_debug_label.text = "SPELL  %s\nHP     %d\n%s" % [spell_text, hp, counts]
 
 
 # Fades the local player's screen to black on death, back on respawn (cosmetic, local only).
