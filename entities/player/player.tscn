@@ -22,8 +22,6 @@ axis_lock_angular_x = true
 axis_lock_angular_y = true
 axis_lock_angular_z = true
 script = ExtResource("1_symyc")
-move_force = 100.0
-max_speed = 100.0
 
 [node name="PlayerInputSynchronizerComponent" parent="." unique_id=1665501618 instance=ExtResource("2_sglur")]
 
