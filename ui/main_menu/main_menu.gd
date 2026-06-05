@@ -9,6 +9,9 @@ var main_scene: PackedScene = preload("uid://dxjewv468c6y2")
 
 
 func _ready() -> void:
+	# The menu always needs a cursor — release any capture left over from in-game
+	# (the player captures the mouse for FP look; returning here must restore it).
+	Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	host_button.pressed.connect(_on_host_pressed)
 	join_button.pressed.connect(_on_join_pressed)
 	name_input.text_changed.connect(_on_name_changed)
