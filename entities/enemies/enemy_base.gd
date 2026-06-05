@@ -12,16 +12,11 @@ extends CharacterBody3D
 @export var melee_damage: int = 10
 @export var melee_range: float = 2.0
 @export var attack_cooldown_sec: float = 1.0
-@export var flash_color: Color = Color(1.0, 0.5, 0.0)  # orange hit feedback
-@export var flash_duration_sec: float = 0.3
 
 @onready var _health: HealthComponent = $HealthComponent
-@onready var _mesh: MeshInstance3D = $MeshInstance3D
 
 var _attack_timer: float = 0.0
 var _arena: Node
-var _base_albedo: Color = Color.WHITE
-var _flash_tween: Tween
 
 
 func _enter_tree() -> void:
@@ -33,14 +28,9 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	_arena = get_tree().current_scene
 	_health.died.connect(_on_died)
-	# Hit-flash feedback. The material is resource_local_to_scene, so each enemy owns its copy
-	# and only the hit one flashes. damage() runs host-side, so we fan the flash out over RPC.
-	var mat := _mesh.material_override as StandardMaterial3D
-	if mat:
-		_base_albedo = mat.albedo_color
-	_health.damaged.connect(_on_damaged)
 	# Maintain the shared live count via the event bus (on every peer — spawn replicates here too),
-	# so the HUD/console don't have to poll Main's "Enemies" node.
+	# so the HUD/console don't have to poll Main's "Enemies" node. Hit-flash feedback now lives in
+	# a reusable HitFlashComponent wired up in enemy_base.tscn.
 	GameEvents.register_enemy()
 
 
@@ -97,27 +87,3 @@ func _on_died() -> void:
 		return  # host owns death; queue_free replicates the removal to clients
 	GameEvents.emit_enemy_died()
 	queue_free()
-
-
-# Host-only: damage() runs on the host, so fan the cosmetic flash out to every peer.
-func _on_damaged() -> void:
-	if not is_multiplayer_authority():
-		return
-	# HealthComponent emits `damaged` after clamping, so health is already 0 on a lethal hit.
-	# Skip the flash then: _on_died queue_free()s this enemy the same frame, and a reliable RPC
-	# + tween on a node being removed just spams "node not found" on clients.
-	if _health.current_health <= 0:
-		return
-	flash_damage.rpc()
-
-
-@rpc("authority", "call_local", "reliable")
-func flash_damage() -> void:
-	var mat := _mesh.material_override as StandardMaterial3D
-	if mat == null:
-		return
-	if _flash_tween and _flash_tween.is_valid():
-		_flash_tween.kill()
-	mat.albedo_color = flash_color
-	_flash_tween = create_tween()
-	_flash_tween.tween_property(mat, "albedo_color", _base_albedo, flash_duration_sec)
