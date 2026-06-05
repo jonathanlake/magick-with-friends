@@ -15,7 +15,16 @@ var _open: bool = false
 func _ready() -> void:
 	_panel.visible = false
 	_line_edit.text_submitted.connect(_on_submit)
+	# Keep the command field focused the whole time the console is open. Submitting with Enter
+	# drops focus (and a single re-grab can be undone a frame later), so re-grab on EVERY focus
+	# loss while open — robust against whatever drops it.
+	_line_edit.focus_exited.connect(_keep_focus_while_open)
 	_println("Dev console ready — type 'help'.")
+
+
+func _keep_focus_while_open() -> void:
+	if _open:
+		_line_edit.grab_focus.call_deferred()
 
 
 func _input(event: InputEvent) -> void:
@@ -42,9 +51,7 @@ func _on_submit(text: String) -> void:
 	if not line.is_empty():
 		_println("> " + line)
 		_run(line)
-	# Defer: grabbing focus synchronously inside the text_submitted handler gets undone as the
-	# Enter event finishes propagating, so the field would lose focus. Re-grab next frame.
-	_line_edit.grab_focus.call_deferred()
+	# Focus is kept by _keep_focus_while_open (fires on the focus_exited that Enter triggers).
 
 
 func _run(line: String) -> void:
