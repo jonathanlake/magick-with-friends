@@ -6,6 +6,7 @@ extends CanvasLayer
 @onready var _fps_label: Label = $FpsPanel/FpsLabel
 @onready var _disconnect_overlay: ColorRect = $DisconnectOverlay
 @onready var _disconnect_label: Label = $DisconnectOverlay/DisconnectLabel
+@onready var _damage_overlay: ColorRect = $DamageOverlay
 
 var _player: Player = null
 var _wand: WandComponent = null
@@ -13,6 +14,7 @@ var _hc: HealthComponent = null
 var _was_dead: bool = false
 var _readout_accum: float = 1.0  # > interval, so the first frame draws the readout immediately
 var _enemy_count: int = 0
+var _damage_tween: Tween
 
 const _READOUT_INTERVAL_SEC := 0.25
 
@@ -21,6 +23,7 @@ func _ready() -> void:
 	# Live enemy count comes from the event bus, not a per-frame poll of Main's "Enemies" node.
 	_enemy_count = GameEvents.alive_enemy_count
 	GameEvents.enemy_count_changed.connect(_on_enemy_count_changed)
+	GameEvents.local_player_damaged.connect(_on_local_player_damaged)
 
 
 func _on_enemy_count_changed(count: int) -> void:
@@ -89,3 +92,18 @@ func _update_death_feedback() -> void:
 func _fade_overlay(overlay: ColorRect, label: Label, target_alpha: float, dur: float, label_visible: bool) -> void:
 	label.visible = label_visible
 	overlay.create_tween().tween_property(overlay, "modulate:a", target_alpha, dur)
+
+
+func _on_local_player_damaged() -> void:
+	show_damage_flash()
+
+
+# First-person self-damage cue (local only): a quick red screen pulse. Separate from the body-color
+# HitFlashComponent (teammates see that, but you can't — your own body is hidden in first-person).
+func show_damage_flash() -> void:
+	if _damage_tween and _damage_tween.is_valid():
+		_damage_tween.kill()
+	_damage_overlay.modulate.a = 0.0
+	_damage_tween = _damage_overlay.create_tween()
+	_damage_tween.tween_property(_damage_overlay, "modulate:a", 0.35, 0.05)
+	_damage_tween.tween_property(_damage_overlay, "modulate:a", 0.0, 0.25)
