@@ -9,7 +9,7 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ## 2026-06-05
 
-*9 PRs merged (#21–#29) · 3 reviews/audits · 2 mid-flight bugs squashed*
+*9 PRs merged (#21–#29) · 3 reviews/audits · 2 bugs caught mid-build*
 
 ### ✨ Features
 

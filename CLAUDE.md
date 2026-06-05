@@ -160,8 +160,8 @@ cosmetic feedback (muzzle flash), decoupled from host-authoritative resolution.
 A spell fuses two swappable slots **on cast** → **one fused effect** (NOT a sequence/program;
 see `DESIGN.md` for the blend rationale and the legibility north star):
 
-- **Form** — delivery shape, where the mechanical distinctness lives (~7 ceiling: projectile,
-  beam, cone, wall, bubble, AoE burst, trap orb). *Slice:* Projectile, AoE burst.
+- **Form** — delivery shape, where the mechanical distinctness lives (the ~7-Form ceiling + the
+  candidate list is a *decision* — see `DESIGN.md`). *Slice:* Projectile, AoE burst.
 - **Element** — thin damage + reaction layer, via a small reaction table. *Slice:* Fire, Lightning.
 - **Modifier** — optional; Split / Bounce / Homing **omitted in the slice** (they erode the
   per-cast legibility blend exists to protect).
@@ -197,7 +197,8 @@ components/
   hit_flash_component.gd/.tscn — Reusable damage flash. @export target_mesh_path / flash_color /
                                 flash_duration_sec / health_component_path. Auto-wires to a
                                 HealthComponent's `damaged`; host fans the cosmetic flash to all
-                                peers via an `any_peer` RPC. Used by players + enemies.
+                                peers via an `any_peer` RPC (deliberate — see RPC Pattern exception:
+                                player nodes are client-owned). Used by players + enemies.
   stamina_component.gd/.tscn   — Two-pool resource + `depleted` signal. OFF the player; files
                                 kept, unused — reserved for a future mana pool.
   player_input_synchronizer_component.gd/.tscn
@@ -273,11 +274,10 @@ The reusable spine that is real and working today:
 - [x] Two-player local multiplayer verified — host + client see each other move (first-person)
 - [x] **Blend casting + friendly fire + death/respawn** — built and validated two-window
 
-> **Online status:** the *vision* is online co-op, and real cross-machine play worked on the
-> **predecessor** framework (external relay / port-forwarding). On **this** codebase only
-> **same-machine two-window** is verified. Per-peer authority *does* propagate (verified — see
-> Known Issues); the remaining gap is a **cross-machine transport** re-test (NAT / relay / latency),
-> not an authority fix (see the `DESIGN.md` roadmap milestone).
+> **Online status:** only **same-machine two-window** is verified on this codebase. Per-peer
+> authority *does* propagate correctly (repro in Known Issues); the open gap is **cross-machine
+> transport** (NAT / relay / latency), not an authority fix. Full story + the re-test plan: the
+> *Re-verify real online MP* milestone in `DESIGN.md` (canonical).
 
 ---
 
@@ -380,6 +380,12 @@ parent wires them in `_ready`.
 - Client → Host: `@rpc("any_peer", "call_remote", "reliable")` — host checks
   `multiplayer.get_remote_sender_id()`.
 - Host → All: `@rpc("authority", "call_local", "reliable")` on a node the host owns.
+- **Exception — host→all on a *client-owned* node uses `any_peer`.** `HitFlashComponent` lives on
+  both host-owned enemy nodes *and* client-owned player nodes. When the host fans a flash to a
+  **player** node it is **not** that node's authority, so an `"authority"` RPC would be rejected —
+  it uses `@rpc("any_peer", "call_local", "reliable")`, guarded by `multiplayer.is_server()` on the
+  trigger so only the host originates it. This is the one sanctioned deviation from the rule above;
+  don't "fix" it back to `authority`.
 - Player input is **never** sent via RPC — use `MultiplayerSynchronizer`.
 
 ### Scene Instancing
@@ -396,9 +402,8 @@ reference by path until the editor assigns a uid on save.)
 - Jolt is the engine (`project.godot`); test with Jolt enabled — its collision response differs.
 
 ### Camera Rig Pattern (First-Person)
-The camera lives on the player body; casting aims forward from it (forward raycast / muzzle
-spawn). No ground-cursor in the slice. Cast *feel* on clients is immediate local cosmetic
-feedback (muzzle flash), decoupled from host-authoritative resolution.
+See **First-Person Camera (current)** under Architecture Overview — camera on the body, casting
+aims forward, no ground-cursor, client cast-feel is local cosmetic muzzle flash.
 
 ### Engine Behavior — Check Current Docs First
 For engine/library/API behavior, check the **version-current Godot docs** (or community consensus)
@@ -416,26 +421,42 @@ two hand-rolled `grab_focus` workarounds failed before a doc check found the one
   CharacterBody3D when writing player-agnostic code — the choice is an open decision (`DESIGN.md`).
 - **Cast feel is host-asymmetric.** The host feels instant casts; clients eat a round-trip. The
   local cosmetic muzzle flash masks it; read playtests knowing host feel ≠ client feel (rotate hosts).
+- **Damage-value timing is host-asymmetric (distinct from cast feel above — that's latency, this is
+  value timing).** `apply_player_damage` on the host pre-applies `hc.damage()` *before* it sends
+  `_sync_health.rpc(...)`, so by the time the synced value lands the host's `current_health` is
+  already the new (lower) value while clients still hold the old one. **Never gate a local cue on
+  `value < current_health`** — it's false on the host and the cue silently no-ops there (exactly the
+  bug behind "self-damage flash worked on clients but not the host"). Emit on the fact that a damage
+  sync arrived, not on a before/after compare.
+- **Typed-node `@export` resolves to `null` from a hand-authored `.tscn`.** A `@export var x:
+  MeshInstance3D` (or any node type) only gets wired when set via the editor's node-picker; a
+  NodePath typed into the `.tscn` by hand stays unresolved and the var reads `null` at runtime — no
+  error, just a silently dead reference. Use `@export var x_path: NodePath` + `get_node_or_null(x_path)`
+  in `_ready()` instead (how `HitFlashComponent` wires its mesh/health). The headless gate can't catch
+  this — verify node wiring with a targeted probe.
 - **Spawn height vs capsule:** keep spawn markers at `y≈1.0`+ so the capsule doesn't clip the floor.
-- **Collision layers (named + explicit).** Four named layers in `project.godot`: `world`=1,
-  `players`=2, `enemies`=3, `projectiles`=4 (bit values 1/2/4/8). Assignments:
-  - **world** (CSG floor + walls): layer=1, mask=0 (static; bodies collide *into* it via their masks).
-  - **player** (`player.tscn` RigidBody3D): layer=2, mask=7 (world+players+enemies — keeps the
-    player↔player and player↔enemy shoving chaos). `GroundCheck` ray is mask=1 (world only).
-  - **enemy** (`enemy_base.tscn` CharacterBody3D): layer=4, mask=7 (world+players+enemies — enemies
-    collide with the arena, players, and each other so they don't stack).
-  - **projectile** (`projectile.tscn` Area3D): layer=8, mask=6 (players+enemies — friendly fire ON,
-    hits both, **ignores world**). It despawns on Player/HealthComponent hits + lifetime, so walls
-    don't stop it (add `world` to the mask + handle it if wall-despawn is ever wanted).
-- **`input_multiplayer_authority` propagation (verified OK — not a bug):** the custom
-  `MultiplayerSpawner` `spawn_function` runs on **all peers** (Godot docs: *"called on all peers"*),
-  so each client re-runs it with the replicated `data` and sets
-  `set_multiplayer_authority(data.peer_id)` on its copies via `_enter_tree`. Observable: enable the
-  DEBUG autoload + run two-window — the `[AUTH]` line in `player.gd` prints each copy's authority
-  from every peer's view (a client sees the host's player as `authority=1 is_mine=false`, its own as
-  `is_mine=true`). Earlier notes calling this "host-only / broken cross-machine" were a misdiagnosis.
-  The genuinely untested piece is **cross-machine transport** (NAT / port-forward / relay) + latency,
-  not authority — see the `DESIGN.md` roadmap milestone.
+- **Collision layers (named + explicit).** Four named layers in `project.godot`, mapping *slot →
+  bit value*: `world` = slot 1 (bit 1), `players` = slot 2 (bit 2), `enemies` = slot 3 (bit 4),
+  `projectiles` = slot 4 (bit 8). **Every `collision_layer`/`collision_mask` number below is a raw
+  bit int** (what's stored in the `.tscn`, = `2^(slot-1)`), *not* a slot number — so `enemies` is
+  `collision_layer = 4`, not 3. Assignments:
+  - **world** (CSG floor + walls): `collision_layer = 1`, `collision_mask = 0` (static; bodies collide
+    *into* it via their masks).
+  - **player** (`player.tscn` RigidBody3D): `collision_layer = 2`, `collision_mask = 7`
+    (world+players+enemies — keeps the player↔player and player↔enemy shoving chaos). `GroundCheck`
+    ray is `collision_mask = 1` (world only).
+  - **enemy** (`enemy_base.tscn` CharacterBody3D): `collision_layer = 4`, `collision_mask = 7`
+    (world+players+enemies — enemies collide with the arena, players, and each other so they don't stack).
+  - **projectile** (`projectile.tscn` Area3D): `collision_layer = 8`, `collision_mask = 6`
+    (players+enemies — friendly fire ON, hits both, **ignores world**). It despawns on
+    Player/HealthComponent hits + lifetime, so walls don't stop it (add `world` to the mask + handle
+    it if wall-despawn is ever wanted).
+- **`input_multiplayer_authority` propagation (verified OK — not a bug).** Earlier notes calling
+  this "host-only / broken cross-machine" were a misdiagnosis; it propagates correctly. **Repro:**
+  enable the DEBUG autoload + run two-window — the `[AUTH]` line in `player.gd` prints each copy's
+  authority from every peer's view (a client sees the host's player as `authority=1 is_mine=false`,
+  its own as `is_mine=true`). *Why it works* and the still-untested cross-machine transport piece:
+  the *Re-verify real online MP* milestone in `DESIGN.md` (canonical — don't restate it here).
 - `main_menu.gd` defaults to `127.0.0.1` and port `3000` (keep the port an `int` — ENet requires it).
 - `multiplayer.connected_to_server` is only wired for the client path; the host transitions
   immediately — correct, don't add host-side handling.

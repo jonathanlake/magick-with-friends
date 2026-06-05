@@ -15,13 +15,11 @@ the decisions here are settled unless told otherwise.
 friendly-fire laughs, happy accidents, jank-as-charm. It is explicitly **NOT** a
 balance-tight, optimal-build competitive game.
 
-> **⚠ Online status (vision vs reality):** the identity is *online* co-op. Real cross-machine
-> play worked on the **predecessor** framework (via external relay / port-forwarding). On
-> **this** codebase only **same-machine two-window** is verified. Per-peer authority **does
-> propagate** to clients — the custom `spawn_function` runs on all peers (confirmed via Godot docs
-> and the two-window `[AUTH]` diagnostic in `player.gd`). The genuinely untested piece is
-> **cross-machine transport** (NAT / port-forward / relay) + latency feel (named roadmap milestone
-> below). Don't claim "online verified" until that cross-machine test is done.
+> **⚠ Online status (vision vs reality):** the identity is *online* co-op, but on **this** codebase
+> only **same-machine two-window** is verified. Per-peer authority **does** propagate correctly — the
+> untested piece is **cross-machine transport** (NAT / relay / latency), not authority. Don't claim
+> "online verified" until that test is done. Full detail + the plan: the *Re-verify real online MP*
+> milestone in the roadmap below (canonical home for this story).
 
 - **Core loop:** 2–4 players fight escalating hordes together in first-person.
   **Friendly fire is ON and is a design pillar** — it's the comedy engine, not a footnote.
@@ -30,6 +28,9 @@ balance-tight, optimal-build competitive game.
   layer). **One cast = one fused effect.** This captures the *feel* of Noita's wands
   (combinatorial, emergent, things-go-wrong) but is deliberately **shallow** — it is **NOT**
   Noita's sequence/program model (no triggers, timers, multicast, or nesting).
+  - **Form ceiling (~7).** Forms carry the mechanical distinctness, so the set is intentionally
+    capped at roughly seven candidates: projectile, beam, cone, wall, bubble, AoE burst, trap orb.
+    Elements stay a thin damage+reaction layer on top. (The slice ships Projectile + AoE burst.)
 - **Randomness is the keystone.** Forms/elements are dealt randomly (drops), so nobody can
   pre-build an optimal loadout. This keeps runs fresh, blocks an external "netdeck" meta,
   and flattens intra-group power gaps so one power-gamer friend can't pull ahead on builds.
@@ -58,7 +59,8 @@ not the per-pixel simulation).
   reactions — the interaction layer needs one resolver to stay consistent and *legible*. This
   matches Godot best practice for trusted friend co-op (peer-owns-input + host-authoritative
   health via RPC). Client-side movement prediction is **not** used; add only if real-connection
-  playtests show input lag.
+  playtests show input lag. The split is *decided*; fully *formalizing* it in code (enemies / waves /
+  pickups / reactions) is a post-slice task, done as those systems land.
 
 **Still open (DECIDE LATER — do not invent these):**
 
@@ -129,7 +131,7 @@ Beyond the slice (only if it proves fun):
   confirm it here on two actual machines before claiming "online." (Not an authority bug — earlier
   notes that framed it as one were a misdiagnosis.)
 - **Velocity sync** for smoother client interpolation.
-- **More Forms/Elements**, modifiers (constrained), mana resource, downed/revive.
+- **More Forms/Elements**, modifiers (constrained), downed/revive.
 
 ---
 
@@ -139,10 +141,7 @@ Beyond the slice (only if it proves fun):
   NOT a per-pixel falling-sand sim. Full simulation (fire spreading per-pixel, liquids,
   electrified water at sim fidelity) is expensive and hard to net-replicate in 3D — stay with
   tagged volumes / area triggers until there's a reason not to.
-- **Authority model** — already decided (see Design decisions); formalize the
-  per-player-self / host-shared split in code when building past the slice.
 - **Mana resource** — repurpose `StaminaComponent` if cooldowns prove too shallow.
-- **Run / meta structure** — stages, between-run progression, objectives.
 - **Steam networking** — replace the ENet peer with `SteamMultiplayerPeer`; keep all
   spawn/RPC logic identical (the point of `NetworkManager`).
 - **Cloudflare Workers / WebSocket relay** — online play without port forwarding.
