@@ -15,6 +15,8 @@ properties/0/spawn = true
 properties/0/replication_mode = 1
 
 [node name="Projectile" type="Area3D"]
+collision_layer = 8
+collision_mask = 6
 script = ExtResource("1_proj")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="."]
