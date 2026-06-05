@@ -21,6 +21,7 @@ config/icon="res://icon.svg"
 GameEvents="*uid://bcwakqiporxi6"
 GameManager="*res://autoloads/game_manager.gd"
 NetworkManager="*res://autoloads/network_manager.gd"
+SpellCatalog="*res://autoloads/spell_catalog.gd"
 DEBUG="res://debug/debug.gd"
 
 [display]

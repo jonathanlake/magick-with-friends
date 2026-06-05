@@ -28,6 +28,9 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	_arena = get_tree().current_scene
 	_health.died.connect(_on_died)
+	# Join the "enemies" group on every peer so the Reactions resolver can find enemies for
+	# AoE/chain targeting (parity with players being in the "players" group).
+	add_to_group("enemies")
 	# Maintain the shared live count via the event bus (on every peer — spawn replicates here too),
 	# so the HUD/console don't have to poll Main's "Enemies" node. Hit-flash feedback now lives in
 	# a reusable HitFlashComponent wired up in enemy_base.tscn.
