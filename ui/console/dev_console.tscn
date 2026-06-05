@@ -1,0 +1,38 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/console/dev_console.gd" id="1_console"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_console"]
+bg_color = Color(0, 0, 0, 0.75)
+content_margin_left = 8.0
+content_margin_top = 8.0
+content_margin_right = 8.0
+content_margin_bottom = 8.0
+
+[node name="DevConsole" type="CanvasLayer"]
+layer = 128
+script = ExtResource("1_console")
+
+[node name="Panel" type="PanelContainer" parent="."]
+anchor_top = 0.6
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_console")
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Panel/Margin"]
+layout_mode = 2
+
+[node name="Output" type="RichTextLabel" parent="Panel/Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+focus_mode = 0
+scroll_following = true
+
+[node name="Input" type="LineEdit" parent="Panel/Margin/VBox"]
+layout_mode = 2
+placeholder_text = "command (try: help)"

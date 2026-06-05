@@ -2,6 +2,7 @@ extends Node
 
 var player_scene: PackedScene = preload("uid://cunquuhctdb1o")
 var _hud_scene: PackedScene = preload("uid://ct7hud5x8kl3n")
+var _console_scene: PackedScene = preload("res://ui/console/dev_console.tscn")
 # New assets — referenced by path until the editor assigns a uid.
 var projectile_scene: PackedScene = preload("res://entities/projectiles/projectile.tscn")
 var enemy_scene: PackedScene = preload("res://entities/enemies/enemy_base.tscn")
@@ -48,6 +49,8 @@ func _ready() -> void:
 		return enemy
 
 	if multiplayer.is_server():
+		# Host-only dev console (read-only commands to ease playtesting).
+		add_child(_console_scene.instantiate())
 		# Spawn the host's own player immediately — no RPC needed.
 		multiplayer_spawner.spawn({"peer_id": multiplayer.get_unique_id(), "player_name": GameManager.player_name})
 		NetworkManager.peer_disconnected.connect(_on_peer_disconnected)
