@@ -14,7 +14,11 @@ func _ready() -> void:
 
 	if not "debug_autostart" in args:
 		return
-	if not ("host" in args or "join" in args):
+	# Role keyword: "host"/"server" start the host, "join"/"client" connect to it. The aliases
+	# exist so the intuitive word (matching the HOST/CLIENT window titles) just works too.
+	var is_host := "host" in args or "server" in args
+	var is_client := "join" in args or "client" in args
+	if not (is_host or is_client):
 		return
 
 	# Autoloads initialize before the main scene loads, and Godot sets its own
@@ -22,14 +26,14 @@ func _ready() -> void:
 	# and the window title are fully settled before we act.
 	await get_tree().process_frame
 
-	if "host" in args:
+	if is_host:
 		DisplayServer.window_set_title("HOST")
 		# Host on the LEFT monitor; falls back to the top-left of a single screen.
 		_place_window_on_screen(_leftmost_screen(), Vector2i(0, 0))
 		GameManager.player_name = "HOST"
 		NetworkManager.host_game()
 		get_tree().change_scene_to_packed(_main_scene)
-	elif "join" in args:
+	elif is_client:
 		DisplayServer.window_set_title("CLIENT")
 		# Client on the MAIN (primary) monitor; falls back to a right-offset on a single screen.
 		_place_window_on_screen(DisplayServer.get_primary_screen(), Vector2i(960, 0))
