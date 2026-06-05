@@ -36,8 +36,8 @@ replication_config = SubResource("SceneReplicationConfig_symyc")
 [node name="HealthComponent" parent="." unique_id=1065936981 instance=ExtResource("3_bls4j")]
 
 [node name="HitFlashComponent" parent="." instance=ExtResource("4_hitflash")]
-target_mesh = NodePath("../MeshInstance3D")
-health_component = NodePath("../HealthComponent")
+target_mesh_path = NodePath("../MeshInstance3D")
+health_component_path = NodePath("../HealthComponent")
 flash_color = Color(1, 0.3, 0.3, 1)
 flash_duration_sec = 0.3
 

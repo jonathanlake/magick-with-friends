@@ -42,7 +42,7 @@ max_health = 40
 replication_config = SubResource("SceneReplicationConfig_enemy")
 
 [node name="HitFlashComponent" parent="." instance=ExtResource("3_hitflash")]
-target_mesh = NodePath("../MeshInstance3D")
-health_component = NodePath("../HealthComponent")
+target_mesh_path = NodePath("../MeshInstance3D")
+health_component_path = NodePath("../HealthComponent")
 flash_color = Color(1, 0.5, 0, 1)
 flash_duration_sec = 0.3
