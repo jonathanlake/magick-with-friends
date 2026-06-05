@@ -25,6 +25,11 @@ var peer_id: int = 1
 # Catalog indices for the dealt blend, set by the spawner (replicated, so identical on every peer).
 var form_idx: int = 0
 var element_idx: int = 0
+# Replicated look-yaw (the player's aim direction). The owning peer writes it from the camera each
+# frame; the player MultiplayerSynchronizer replicates it outward (see player.tscn) so remote copies
+# can face the model where the player is actually looking. The body is angular-locked and never
+# rotates, so we rotate the Visual node by this instead.
+var aim_yaw: float = 0.0
 
 @onready var _input_sync: PlayerInputSynchronizerComponent = $PlayerInputSynchronizerComponent
 @onready var _camera_rig: Node3D = $CameraRig
@@ -101,12 +106,20 @@ func _input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	if not is_multiplayer_authority():
+		# Remote copy: orient the visible model to the replicated look-yaw (body is angular-locked).
+		if _visual:
+			_visual.rotation.y = aim_yaw
 		return
 
 	var target := global_position + Vector3(0.0, camera_height, 0.0)
 	_camera_rig.global_position = _camera_rig.global_position.lerp(target, camera_smoothing * delta)
 	_camera_rig.global_rotation.y = _camera_yaw
 	_camera.rotation.x = _camera_pitch
+
+	# Publish our look-yaw for remotes, and face our own (FP-hidden) model the same way.
+	aim_yaw = _camera_yaw
+	if _visual:
+		_visual.rotation.y = aim_yaw
 
 	if _dead:
 		return
