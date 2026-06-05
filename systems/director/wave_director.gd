@@ -21,6 +21,11 @@ var _wave_index: int = 0
 var _enemy_counter: int = 0
 
 
+# Read-only accessor for the dev console / HUD.
+func current_wave() -> int:
+	return _wave_index
+
+
 func _ready() -> void:
 	# Clients run nothing — all spawning is host-authoritative.
 	if not multiplayer.is_server():

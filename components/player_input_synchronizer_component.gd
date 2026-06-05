@@ -10,5 +10,9 @@ func _process(_delta: float):
 
 
 func gather_input():
+	if GameManager.console_open:
+		movement_vector = Vector2.ZERO
+		is_jump_pressed = false
+		return
 	movement_vector = Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	is_jump_pressed = Input.is_action_pressed("jump")

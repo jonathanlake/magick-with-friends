@@ -57,6 +57,8 @@ func _ready() -> void:
 func _input(event: InputEvent) -> void:
 	if not is_multiplayer_authority():
 		return
+	if GameManager.console_open:
+		return  # dev console focused — don't look / re-capture the mouse
 	if event.is_action_pressed("ui_cancel"):
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
