@@ -24,16 +24,37 @@ func _ready() -> void:
 
 	if "host" in args:
 		DisplayServer.window_set_title("HOST")
-		DisplayServer.window_set_position(Vector2i(0, 0))
+		# Host on the LEFT monitor; falls back to the top-left of a single screen.
+		_place_window_on_screen(_leftmost_screen(), Vector2i(0, 0))
 		GameManager.player_name = "HOST"
 		NetworkManager.host_game()
 		get_tree().change_scene_to_packed(_main_scene)
 	elif "join" in args:
 		DisplayServer.window_set_title("CLIENT")
-		DisplayServer.window_set_position(Vector2i(960, 0))
+		# Client on the MAIN (primary) monitor; falls back to a right-offset on a single screen.
+		_place_window_on_screen(DisplayServer.get_primary_screen(), Vector2i(960, 0))
 		GameManager.player_name = "CLIENT"
 		# main_menu._on_connection_succeeded handles the scene transition.
 		NetworkManager.join_game("127.0.0.1")
+
+
+# Move this instance's window to the top-left of the given monitor. If there's only one
+# screen (or the index is invalid), use fallback_pos so the two windows still sit side by side.
+func _place_window_on_screen(screen: int, fallback_pos: Vector2i) -> void:
+	if DisplayServer.get_screen_count() < 2 or screen < 0 or screen >= DisplayServer.get_screen_count():
+		DisplayServer.window_set_position(fallback_pos)
+		return
+	DisplayServer.window_set_current_screen(screen)
+	DisplayServer.window_set_position(DisplayServer.screen_get_position(screen))
+
+
+# Index of the physically leftmost monitor (smallest virtual-desktop x).
+func _leftmost_screen() -> int:
+	var best := 0
+	for i in DisplayServer.get_screen_count():
+		if DisplayServer.screen_get_position(i).x < DisplayServer.screen_get_position(best).x:
+			best = i
+	return best
 
 
 # Host headless, load Main, wait a few frames, and assert the host player spawned.

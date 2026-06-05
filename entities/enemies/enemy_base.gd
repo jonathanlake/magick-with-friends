@@ -13,7 +13,7 @@ extends CharacterBody3D
 @export var melee_range: float = 2.0
 @export var attack_cooldown_sec: float = 1.0
 @export var flash_color: Color = Color(1.0, 0.5, 0.0)  # orange hit feedback
-@export var flash_duration_sec: float = 0.15
+@export var flash_duration_sec: float = 0.3
 
 @onready var _health: HealthComponent = $HealthComponent
 @onready var _mesh: MeshInstance3D = $MeshInstance3D
