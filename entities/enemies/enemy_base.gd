@@ -69,12 +69,13 @@ func _physics_process(delta: float) -> void:
 	move_and_slide()
 
 
-# Players are direct children of Main, named str(peer_id). Pick the closest one still alive.
+# Pick the closest still-alive player. Uses the "players" group (maintained by the engine)
+# instead of scanning + casting every Main child each physics frame.
 func _find_nearest_player() -> Player:
 	var nearest: Player = null
 	var nearest_dist := INF
-	for child in _arena.get_children():
-		var p := child as Player
+	for node in get_tree().get_nodes_in_group("players"):
+		var p := node as Player
 		if p == null or p.is_dead():
 			continue
 		var d := global_position.distance_squared_to(p.global_position)

@@ -8,16 +8,33 @@ extends CanvasLayer
 @onready var _disconnect_label: Label = $DisconnectOverlay/DisconnectLabel
 
 var _player: Player = null
+var _wand: WandComponent = null
+var _hc: HealthComponent = null
 var _was_dead: bool = false
+var _readout_accum: float = 1.0  # > interval, so the first frame draws the readout immediately
+
+const _READOUT_INTERVAL_SEC := 0.25
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if not _player:
 		var peer_id := str(multiplayer.get_unique_id())
 		_player = get_parent().get_node_or_null(peer_id) as Player
+		if _player:
+			# Cache the per-player nodes once — they never move relative to the player, so there's
+			# no reason to re-resolve + cast them every frame.
+			_wand = _player.get_node_or_null("WandComponent") as WandComponent
+			_hc = _player.get_node_or_null("HealthComponent") as HealthComponent
 
-	_fps_label.text = "FPS %d" % int(Engine.get_frames_per_second())
-	_update_readout()
+	# Throttle the text readout (incl. FPS, which only changes ~1x/sec) instead of reformatting
+	# and reassigning the whole label string every frame.
+	_readout_accum += delta
+	if _readout_accum >= _READOUT_INTERVAL_SEC:
+		_readout_accum = 0.0
+		_update_readout()
+
+	# Death feedback stays per-frame: it's event-driven on the is_dead() change and early-returns
+	# when unchanged, so it must stay responsive (and is cheap).
 	_update_death_feedback()
 
 
@@ -27,15 +44,14 @@ func _update_readout() -> void:
 	var enemies := get_parent().get_node_or_null("Enemies")
 	var enemy_count: int = enemies.get_child_count() if enemies else 0
 	var player_count: int = multiplayer.get_peers().size() + 1
+	_fps_label.text = "FPS %d" % int(Engine.get_frames_per_second())
 	var counts := "ENEMIES %d\nPLAYERS %d" % [enemy_count, player_count]
 
 	if not _player:
 		_debug_label.text = "(no player)\n%s" % counts
 		return
-	var wand := _player.get_node_or_null("WandComponent") as WandComponent
-	var hc := _player.get_node_or_null("HealthComponent") as HealthComponent
-	var spell_text: String = wand.current_spell_text() if wand else "?"
-	var hp: int = hc.current_health if hc else 0
+	var spell_text: String = _wand.current_spell_text() if _wand else "?"
+	var hp: int = _hc.current_health if _hc else 0
 	_debug_label.text = "SPELL =  %s\nHP     %d\n%s" % [spell_text, hp, counts]
 
 
