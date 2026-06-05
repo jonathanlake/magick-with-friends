@@ -30,7 +30,9 @@ var element_idx: int = 0
 @onready var _camera_rig: Node3D = $CameraRig
 @onready var _camera: Camera3D = $CameraRig/Camera3D
 @onready var _name_label: Label3D = $NameLabel
-@onready var _mesh: MeshInstance3D = $MeshInstance3D
+# The visible body (placeholder capsule, or a swapped-in model — see CharacterVisual). Hidden for the
+# local first-person player; shown for remote copies so teammates see this player's body.
+@onready var _visual: Node3D = $Visual
 @onready var _ground_check: RayCast3D = $GroundCheck
 
 var _camera_yaw: float = 0.0
@@ -70,7 +72,7 @@ func _ready() -> void:
 
 	_camera.current = true
 	_name_label.visible = false
-	_mesh.visible = false
+	_visual.visible = false
 	_camera_rig.global_position = global_position + Vector3(0.0, camera_height, 0.0)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -161,11 +163,11 @@ func set_dead(dead: bool) -> void:
 	_dead = dead
 	freeze = dead
 	if dead:
-		_mesh.visible = false
+		_visual.visible = false
 		_name_label.visible = false
 	else:
-		# Remote players show their mesh + name; the local first-person player keeps both hidden.
-		_mesh.visible = not is_multiplayer_authority()
+		# Remote players show their body + name; the local first-person player keeps both hidden.
+		_visual.visible = not is_multiplayer_authority()
 		_name_label.visible = not is_multiplayer_authority()
 
 

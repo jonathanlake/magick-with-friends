@@ -1,3 +1,8 @@
 # Godot 4+ specific ignores
 .godot/
 /android/
+
+# Third-party art assets (paid KayKit packs) — license-restricted, kept local only.
+# Code loads these at runtime if present and falls back to placeholder meshes if absent,
+# so the repo still builds/runs without them. See components/character_visual.gd.
+/assets/
