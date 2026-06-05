@@ -17,9 +17,11 @@ balance-tight, optimal-build competitive game.
 
 > **⚠ Online status (vision vs reality):** the identity is *online* co-op. Real cross-machine
 > play worked on the **predecessor** framework (via external relay / port-forwarding). On
-> **this** codebase only **same-machine two-window** is verified — real online still needs the
-> client-authority-propagation fix + a cross-machine re-test (named roadmap milestone below).
-> Don't claim "online verified" until that's done.
+> **this** codebase only **same-machine two-window** is verified. Per-peer authority **does
+> propagate** to clients — the custom `spawn_function` runs on all peers (confirmed via Godot docs
+> and the two-window `[AUTH]` diagnostic in `player.gd`). The genuinely untested piece is
+> **cross-machine transport** (NAT / port-forward / relay) + latency feel (named roadmap milestone
+> below). Don't claim "online verified" until that cross-machine test is done.
 
 - **Core loop:** 2–4 players fight escalating hordes together in first-person.
   **Friendly fire is ON and is a design pillar** — it's the comedy engine, not a footnote.
@@ -118,10 +120,13 @@ Beyond the slice (only if it proves fun):
 - **Run / meta structure** beyond wave-survival.
 - **Production HUD** (health/shield, current spell, wave/timer).
 - **Spawn point system** (4–8 points, by player index).
-- **Re-verify real online MP (named milestone).** `spawn_function` runs host-only, so clients
-  never call `set_multiplayer_authority` on their copy — fine same-machine (all peers read as
-  peer 1), broken cross-machine. Real online worked on the predecessor (external relay); here it
-  needs this client-authority fix **+ an actual cross-machine test** before "online" is claimed.
+- **Re-verify real online MP (named milestone).** Per-peer authority already propagates correctly
+  — the custom `spawn_function` runs on **all peers** (Godot docs), so each client re-runs it and
+  sets `set_multiplayer_authority(data.peer_id)` on its copies. Verifiable now via the two-window
+  `[AUTH]` diagnostic in `player.gd`. What's still untested is **cross-machine transport** (NAT /
+  port-forwarding / relay) + latency feel — real online worked on the predecessor (external relay);
+  confirm it here on two actual machines before claiming "online." (Not an authority bug — earlier
+  notes that framed it as one were a misdiagnosis.)
 - **Velocity sync** for smoother client interpolation.
 - **More Forms/Elements**, modifiers (constrained), mana resource, downed/revive.
 

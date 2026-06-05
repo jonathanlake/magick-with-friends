@@ -336,8 +336,9 @@ no single one is complete (verified empirically):
    ```
    bash tools/smoke-test.sh
    ```
-   Prints `SMOKE: PASS` / `FAIL` (exit 0/1). **Host-driven only** — it does not exercise input
-   (casting/movement); that stays with the two-window playtest.
+   Prints `SMOKE: PASS` / `FAIL` (exit 0/1; run it from **Git Bash**, bundled with Git for Windows).
+   **Host-driven only** — it does not exercise input (casting/movement); that stays with the
+   two-window playtest.
 
 Together these catch the "won't parse / won't load / won't boot" bugs a no-Godot session would
 ship blind. They are the cheap gate **before** the two-window playtest — not a replacement.
@@ -410,9 +411,15 @@ two hand-rolled `grab_focus` workarounds failed before a doc check found the one
   physically shove each other and players. **Cleanup item:** define named layers
   (world / players / enemies / projectiles) in `project.godot` and set each body's layer/mask
   explicitly (remember to widen the projectile Area3D mask to include the enemy layer).
-- **`input_multiplayer_authority` on clients:** `spawn_function` runs on the host only, so clients
-  never call `set_multiplayer_authority` on their copy. Works for same-machine testing (all peers
-  read as peer 1); needs fixing for real multiplayer.
+- **`input_multiplayer_authority` propagation (verified OK — not a bug):** the custom
+  `MultiplayerSpawner` `spawn_function` runs on **all peers** (Godot docs: *"called on all peers"*),
+  so each client re-runs it with the replicated `data` and sets
+  `set_multiplayer_authority(data.peer_id)` on its copies via `_enter_tree`. Observable: enable the
+  DEBUG autoload + run two-window — the `[AUTH]` line in `player.gd` prints each copy's authority
+  from every peer's view (a client sees the host's player as `authority=1 is_mine=false`, its own as
+  `is_mine=true`). Earlier notes calling this "host-only / broken cross-machine" were a misdiagnosis.
+  The genuinely untested piece is **cross-machine transport** (NAT / port-forward / relay) + latency,
+  not authority — see the `DESIGN.md` roadmap milestone.
 - `main_menu.gd` defaults to `127.0.0.1` and port `3000` (keep the port an `int` — ENet requires it).
 - `multiplayer.connected_to_server` is only wired for the client path; the host transitions
   immediately — correct, don't add host-side handling.

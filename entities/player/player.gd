@@ -45,6 +45,11 @@ func _ready() -> void:
 	# instead of scanning all of Main's children + casting each one every physics frame.
 	add_to_group("players")
 
+	# Log the authority assigned to this copy (debug sessions only). Before the authority
+	# early-return below, so it also reports REMOTE player copies — which is the point: it lets a
+	# two-window run prove per-peer authority actually propagated to clients.
+	_log_authority_if_debug()
+
 	# Wand on every peer's copy (same node path) so RPC cast requests route to the host.
 	_wand = WandComponent.new()
 	_wand.name = "WandComponent"
@@ -151,3 +156,13 @@ func set_dead(dead: bool) -> void:
 
 func is_dead() -> bool:
 	return _dead
+
+
+# Debug-only authority probe. Gated on the DEBUG autoload existing (it's disabled by default, no
+# `*`, so this is silent in normal play and exported builds — it only fires during a two-window
+# `debug_autostart` session). Prints, from THIS peer's view, what authority each player copy got.
+func _log_authority_if_debug() -> void:
+	if get_node_or_null("/root/DEBUG") == null:
+		return
+	print("[AUTH] peer %d sees Player '%s': authority=%d is_mine=%s" % [
+		multiplayer.get_unique_id(), name, get_multiplayer_authority(), is_multiplayer_authority()])
