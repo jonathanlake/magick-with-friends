@@ -5,7 +5,10 @@ var _hud_scene: PackedScene = preload("uid://ct7hud5x8kl3n")
 # New assets — referenced by path until the editor assigns a uid.
 var projectile_scene: PackedScene = preload("res://entities/projectiles/projectile.tscn")
 var enemy_scene: PackedScene = preload("res://entities/enemies/enemy_base.tscn")
-var _menu_scene: PackedScene = preload("uid://c7c1omna7f0iq")  # main_menu.tscn (project main scene)
+# main_menu.tscn — load()ed at runtime (NOT preload) to avoid a cyclic scene dependency:
+# main_menu.gd preloads main.tscn, which uses this script, so preloading the menu here would
+# make one of the two scenes resolve as an empty PackedScene.
+const _MENU_SCENE_UID := "uid://c7c1omna7f0iq"
 
 @onready var multiplayer_spawner: MultiplayerSpawner = $MultiplayerSpawner
 @onready var projectile_spawner: MultiplayerSpawner = $ProjectileSpawner
@@ -74,7 +77,7 @@ func _on_server_disconnected() -> void:
 	# process_always = true so the timer still fires while the tree is paused.
 	await get_tree().create_timer(2.5, true).timeout
 	get_tree().paused = false
-	get_tree().change_scene_to_packed(_menu_scene)
+	get_tree().change_scene_to_packed(load(_MENU_SCENE_UID))
 
 
 @rpc("any_peer", "call_remote", "reliable")
