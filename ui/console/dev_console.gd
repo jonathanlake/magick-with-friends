@@ -83,10 +83,8 @@ func _cmd_players() -> void:
 func _cmd_wave() -> void:
 	var main := get_parent()
 	var director := main.get_node_or_null("WaveDirector")
-	var enemies := main.get_node_or_null("Enemies")
 	var wave_txt: String = str(director.current_wave()) if director and director.has_method("current_wave") else "?"
-	var alive: int = enemies.get_child_count() if enemies else 0
-	_println("  wave %s, %d enemies alive" % [wave_txt, alive])
+	_println("  wave %s, %d enemies alive" % [wave_txt, GameEvents.alive_enemy_count])
 
 
 func _println(s: String) -> void:

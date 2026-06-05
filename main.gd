@@ -24,6 +24,10 @@ var _leaving: bool = false
 
 
 func _ready() -> void:
+	# GameEvents is an autoload that outlives the scene; clear any count carried over from a prior
+	# session before the HUD (added just below) seeds itself from it.
+	GameEvents.alive_enemy_count = 0
+
 	_hud = _hud_scene.instantiate()
 	add_child(_hud)
 
@@ -31,6 +35,7 @@ func _ready() -> void:
 		var player := player_scene.instantiate() as Player
 		player.name = str(data.peer_id)
 		player.input_multiplayer_authority = data.peer_id
+		player.peer_id = data.peer_id
 		player.player_name = data.player_name
 		player.position = player_spawn_position.global_position
 		return player

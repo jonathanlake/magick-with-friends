@@ -15,6 +15,10 @@ extends RigidBody3D
 # so MultiplayerSynchronizer children register with the correct authority on tree entry.
 var input_multiplayer_authority: int = 1
 var player_name: String = ""
+# This player's owning peer id, set by the spawner. Used to route host-authoritative damage
+# without parsing it back out of the node name (the node IS named str(peer_id), but the reverse
+# parse silently yields 0 for any non-numeric name).
+var peer_id: int = 1
 
 @onready var _input_sync: PlayerInputSynchronizerComponent = $PlayerInputSynchronizerComponent
 @onready var _camera_rig: Node3D = $CameraRig
