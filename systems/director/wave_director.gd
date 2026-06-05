@@ -35,6 +35,10 @@ func _ready() -> void:
 
 func _run_waves() -> void:
 	await get_tree().create_timer(first_wave_delay_sec).timeout
+	# Each await can resume after this node has been detached (host quit / scene swap); bail
+	# rather than touch get_parent() on an orphaned node.
+	if not is_inside_tree():
+		return
 	while is_inside_tree():
 		_wave_index += 1
 		var count := base_enemies_per_wave + enemies_added_per_wave * (_wave_index - 1)
@@ -42,7 +46,11 @@ func _run_waves() -> void:
 		for _i in count:
 			_spawn_one()
 			await get_tree().create_timer(spawn_interval_sec).timeout
+			if not is_inside_tree():
+				return
 		await get_tree().create_timer(time_between_waves_sec).timeout
+		if not is_inside_tree():
+			return
 
 
 func _spawn_one() -> void:

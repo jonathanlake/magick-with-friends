@@ -18,6 +18,13 @@ func _ready() -> void:
 	_println("Dev console ready — type 'help'.")
 
 
+func _exit_tree() -> void:
+	# If the console is freed while open (e.g. the host returns to menu mid-command), clear the
+	# global input-suspend flag so the next session doesn't start with movement/look frozen.
+	if _open:
+		GameManager.console_open = false
+
+
 func _input(event: InputEvent) -> void:
 	if event.is_action_pressed("toggle_console"):
 		_toggle()
