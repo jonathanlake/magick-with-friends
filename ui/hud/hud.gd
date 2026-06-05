@@ -12,8 +12,19 @@ var _wand: WandComponent = null
 var _hc: HealthComponent = null
 var _was_dead: bool = false
 var _readout_accum: float = 1.0  # > interval, so the first frame draws the readout immediately
+var _enemy_count: int = 0
 
 const _READOUT_INTERVAL_SEC := 0.25
+
+
+func _ready() -> void:
+	# Live enemy count comes from the event bus, not a per-frame poll of Main's "Enemies" node.
+	_enemy_count = GameEvents.alive_enemy_count
+	GameEvents.enemy_count_changed.connect(_on_enemy_count_changed)
+
+
+func _on_enemy_count_changed(count: int) -> void:
+	_enemy_count = count
 
 
 func _process(delta: float) -> void:
@@ -39,13 +50,11 @@ func _process(delta: float) -> void:
 
 
 func _update_readout() -> void:
-	# Counts are computed on every peer (enemies replicate to all; peer list is the same
-	# everywhere) and shown even before the local player resolves.
-	var enemies := get_parent().get_node_or_null("Enemies")
-	var enemy_count: int = enemies.get_child_count() if enemies else 0
+	# Counts are consistent on every peer (enemy count is bus-tracked and replicates; the peer list
+	# is the same everywhere) and shown even before the local player resolves.
 	var player_count: int = multiplayer.get_peers().size() + 1
 	_fps_label.text = "FPS %d" % int(Engine.get_frames_per_second())
-	var counts := "ENEMIES %d\nPLAYERS %d" % [enemy_count, player_count]
+	var counts := "ENEMIES %d\nPLAYERS %d" % [_enemy_count, player_count]
 
 	if not _player:
 		_debug_label.text = "(no player)\n%s" % counts
@@ -55,11 +64,10 @@ func _update_readout() -> void:
 	_debug_label.text = "SPELL =  %s\nHP     %d\n%s" % [spell_text, hp, counts]
 
 
-# Shown when the host leaves. The overlay node is PROCESS_MODE_ALWAYS, so binding the fade tween
-# to it lets it animate even though the caller pauses the tree right after (crash-safe shutdown).
+# Shown when the host leaves. The disconnect overlay is PROCESS_MODE_ALWAYS, so its fade still
+# animates even though the caller pauses the tree right after (crash-safe shutdown).
 func show_host_left() -> void:
-	_disconnect_label.visible = true
-	_disconnect_overlay.create_tween().tween_property(_disconnect_overlay, "modulate:a", 1.0, 0.4)
+	_fade_overlay(_disconnect_overlay, _disconnect_label, 1.0, 0.4, true)
 
 
 # Fades the local player's screen to black on death, back on respawn (cosmetic, local only).
@@ -71,8 +79,13 @@ func _update_death_feedback() -> void:
 		return
 	_was_dead = dead
 	if dead:
-		_death_label.visible = true
-		create_tween().tween_property(_death_overlay, "modulate:a", 0.85, 0.25)
+		_fade_overlay(_death_overlay, _death_label, 0.85, 0.25, true)
 	else:
-		_death_label.visible = false
-		create_tween().tween_property(_death_overlay, "modulate:a", 0.0, 0.4)
+		_fade_overlay(_death_overlay, _death_label, 0.0, 0.4, false)
+
+
+# Shared overlay fade: toggle the label and tween the overlay's alpha. The tween is bound to the
+# overlay node (not the HUD), so a PROCESS_MODE_ALWAYS overlay still animates while the tree is paused.
+func _fade_overlay(overlay: ColorRect, label: Label, target_alpha: float, dur: float, label_visible: bool) -> void:
+	label.visible = label_visible
+	overlay.create_tween().tween_property(overlay, "modulate:a", target_alpha, dur)

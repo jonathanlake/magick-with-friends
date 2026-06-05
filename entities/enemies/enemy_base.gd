@@ -39,6 +39,13 @@ func _ready() -> void:
 	if mat:
 		_base_albedo = mat.albedo_color
 	_health.damaged.connect(_on_damaged)
+	# Maintain the shared live count via the event bus (on every peer — spawn replicates here too),
+	# so the HUD/console don't have to poll Main's "Enemies" node.
+	GameEvents.register_enemy()
+
+
+func _exit_tree() -> void:
+	GameEvents.unregister_enemy()
 
 
 func _physics_process(delta: float) -> void:
@@ -61,7 +68,7 @@ func _physics_process(delta: float) -> void:
 			_attack_timer = attack_cooldown_sec
 			# Player damage is host-authoritative and routed through Main (RPC health sync).
 			if _arena.has_method("apply_player_damage"):
-				_arena.apply_player_damage(int(str(target.name)), melee_damage)
+				_arena.apply_player_damage(target.peer_id, melee_damage)
 	else:
 		velocity.x = 0.0
 		velocity.z = 0.0
