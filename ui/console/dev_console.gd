@@ -42,9 +42,8 @@ func _on_submit(text: String) -> void:
 	if not line.is_empty():
 		_println("> " + line)
 		_run(line)
-	# Defer: grabbing focus synchronously inside the text_submitted handler gets undone as the
-	# Enter event finishes propagating, so the field would lose focus. Re-grab next frame.
-	_line_edit.grab_focus.call_deferred()
+	# The field stays in edit mode after Enter via the LineEdit's keep_editing_on_text_submit
+	# property (set in dev_console.tscn) — no focus juggling needed.
 
 
 func _run(line: String) -> void:
