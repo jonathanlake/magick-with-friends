@@ -5,6 +5,7 @@ var _hud_scene: PackedScene = preload("uid://ct7hud5x8kl3n")
 # New assets — referenced by path until the editor assigns a uid.
 var projectile_scene: PackedScene = preload("res://entities/projectiles/projectile.tscn")
 var enemy_scene: PackedScene = preload("res://entities/enemies/enemy_base.tscn")
+var _menu_scene: PackedScene = preload("uid://c7c1omna7f0iq")  # main_menu.tscn (project main scene)
 
 @onready var multiplayer_spawner: MultiplayerSpawner = $MultiplayerSpawner
 @onready var projectile_spawner: MultiplayerSpawner = $ProjectileSpawner
@@ -13,10 +14,14 @@ var enemy_scene: PackedScene = preload("res://entities/enemies/enemy_base.tscn")
 
 # Host-only guard so a dead player only queues one respawn.
 var _respawning: Dictionary = {}
+# HUD instance (kept so we can show the "host left" overlay) + one-shot leave guard.
+var _hud: Node = null
+var _leaving: bool = false
 
 
 func _ready() -> void:
-	add_child(_hud_scene.instantiate())
+	_hud = _hud_scene.instantiate()
+	add_child(_hud)
 
 	multiplayer_spawner.spawn_function = func(data):
 		var player := player_scene.instantiate() as Player
@@ -47,12 +52,29 @@ func _ready() -> void:
 		# Tell the host we're ready. The RPC fires only on the host (call_remote),
 		# so get_remote_sender_id() is always a real peer ID, never 0.
 		peer_ready.rpc_id(1, GameManager.player_name)
+		# Only clients can lose the host. NetworkManager re-emits this and nulls the peer.
+		NetworkManager.server_disconnected.connect(_on_server_disconnected)
 
 
 func _on_peer_disconnected(peer_id: int) -> void:
 	var player_node := get_node_or_null(str(peer_id))
 	if player_node:
 		player_node.queue_free()
+
+
+# Client-side: the host left. Freeze the game (pause halts the per-frame RPC/spawner/synchronizer
+# work that would otherwise crash against the now-null peer), show the overlay, then bail to menu.
+func _on_server_disconnected() -> void:
+	if _leaving:
+		return
+	_leaving = true
+	if _hud and _hud.has_method("show_host_left"):
+		_hud.show_host_left()
+	get_tree().paused = true
+	# process_always = true so the timer still fires while the tree is paused.
+	await get_tree().create_timer(2.5, true).timeout
+	get_tree().paused = false
+	get_tree().change_scene_to_packed(_menu_scene)
 
 
 @rpc("any_peer", "call_remote", "reliable")

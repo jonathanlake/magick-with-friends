@@ -142,3 +142,17 @@ Beyond the slice (only if it proves fun):
 - **Cloudflare Workers / WebSocket relay** — online play without port forwarding.
 - **Lobby / ready system**, **spectator camera** for dead players, **gamepad** bindings +
   right-stick look.
+- **Multiplayer sandbox / swappable mini-game levels (direction, not committed).** A possible
+  broadening of the project: keep the co-op "friendslop" netcode spine (host/join, the
+  `MultiplayerSpawner` + RPC + host-authoritative model) **constant**, and let the *level* be the
+  game — the current horde spell-caster becomes one level; other levels could be entirely
+  different mini-games sharing the same netcode. The **host picks which level/game** to run, and
+  that choice broadcasts to clients. The architecture is already most of the way there:
+  - the level is a **swappable child node** in `main.tscn` (`TestLevel` instance), not hard-wired
+    into the game logic;
+  - player spawning is **level-agnostic** — `main.gd` finds `PlayerSpawnPosition` via
+    `find_child(...)`, so any level with that marker just works;
+  - `GameManager`/`GameConfig` + the existing host→client RPC pattern already carry pre-game
+    config, so a `selected_level` field + a broadcast RPC slot in cleanly.
+  This is a *direction to keep in mind*, not a scheduled item — the vertical slice (the spell
+  game) still comes first.
