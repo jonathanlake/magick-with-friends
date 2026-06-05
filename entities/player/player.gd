@@ -22,6 +22,9 @@ var player_name: String = ""
 # without parsing it back out of the node name (the node IS named str(peer_id), but the reverse
 # parse silently yields 0 for any non-numeric name).
 var peer_id: int = 1
+# Catalog indices for the dealt blend, set by the spawner (replicated, so identical on every peer).
+var form_idx: int = 0
+var element_idx: int = 0
 
 @onready var _input_sync: PlayerInputSynchronizerComponent = $PlayerInputSynchronizerComponent
 @onready var _camera_rig: Node3D = $CameraRig
@@ -54,8 +57,11 @@ func _ready() -> void:
 	_log_authority_if_debug()
 
 	# Wand on every peer's copy (same node path) so RPC cast requests route to the host.
+	# Indices set before add_child so the wand builds the dealt blend from the catalog in _ready.
 	_wand = WandComponent.new()
 	_wand.name = "WandComponent"
+	_wand.form_idx = form_idx
+	_wand.element_idx = element_idx
 	add_child(_wand)
 
 	if not is_multiplayer_authority():
@@ -74,6 +80,12 @@ func _input(event: InputEvent) -> void:
 		return
 	if GameManager.console_open:
 		return  # dev console focused — don't look / re-capture the mouse
+	# Dev-only: cycle through all Form×Element blends (gated on the DEBUG autoload, so it never fires
+	# in normal play / exported builds). Lets a solo tester feel all four without restarting.
+	if event is InputEventKey and event.pressed and not event.echo \
+			and event.keycode == KEY_B and get_node_or_null("/root/DEBUG") != null:
+		_cycle_debug_spell()
+		return
 	if event.is_action_pressed("ui_cancel"):
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT \
@@ -159,6 +171,19 @@ func set_dead(dead: bool) -> void:
 
 func is_dead() -> bool:
 	return _dead
+
+
+# Dev-only: advance to the next (Form, Element) combo and re-equip via the wand's host-broadcast
+# equip-sync, so every peer sees the change (the same seam pickups will use in item 6).
+func _cycle_debug_spell() -> void:
+	if _wand == null:
+		return
+	var ec := SpellCatalog.element_count()
+	var total := SpellCatalog.form_count() * ec
+	if total <= 0:
+		return
+	var linear := (_wand.form_idx * ec + _wand.element_idx + 1) % total
+	_wand.request_set_blend(linear / ec, linear % ec)
 
 
 # Debug-only authority probe. Gated on the DEBUG autoload existing (it's disabled by default, no

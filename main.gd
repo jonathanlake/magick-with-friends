@@ -37,6 +37,10 @@ func _ready() -> void:
 		player.input_multiplayer_authority = data.peer_id
 		player.peer_id = data.peer_id
 		player.player_name = data.player_name
+		# Catalog indices for the random-dealt blend (host rolls them in _player_spawn_config).
+		# Travel as ints so every peer rebuilds the same wand.
+		player.form_idx = int(data.get("form_idx", 0))
+		player.element_idx = int(data.get("element_idx", 0))
 		player.position = player_spawn_position.global_position
 		return player
 
@@ -57,7 +61,7 @@ func _ready() -> void:
 		# Host-only dev console (read-only commands to ease playtesting).
 		add_child(_console_scene.instantiate())
 		# Spawn the host's own player immediately — no RPC needed.
-		multiplayer_spawner.spawn({"peer_id": multiplayer.get_unique_id(), "player_name": GameManager.player_name})
+		multiplayer_spawner.spawn(_player_spawn_config(multiplayer.get_unique_id(), GameManager.player_name))
 		NetworkManager.peer_disconnected.connect(_on_peer_disconnected)
 	else:
 		# Tell the host we're ready. The RPC fires only on the host (call_remote),
@@ -92,7 +96,19 @@ func _on_server_disconnected() -> void:
 func peer_ready(p_name: String) -> void:
 	var peer_id := multiplayer.get_remote_sender_id()
 	if multiplayer.get_peers().size() < GameManager.config.max_players:
-		multiplayer_spawner.spawn({"peer_id": peer_id, "player_name": p_name})
+		multiplayer_spawner.spawn(_player_spawn_config(peer_id, p_name))
+
+
+## Host-only. Builds the player spawn config, rolling a random (Form, Element) blend from the
+## catalog. Indices travel to every peer in the replicated config so each rebuilds the same wand.
+## (Acquisition/pickups in item 6 will later let players change this via the wand's equip-sync RPC.)
+func _player_spawn_config(peer_id: int, p_name: String) -> Dictionary:
+	return {
+		"peer_id": peer_id,
+		"player_name": p_name,
+		"form_idx": randi() % SpellCatalog.form_count(),
+		"element_idx": randi() % SpellCatalog.element_count(),
+	}
 
 
 # ── Spell projectiles (host-authoritative) ───────────────────────────────────
@@ -107,6 +123,26 @@ func spawn_projectile(config: Dictionary) -> void:
 func spawn_enemy(config: Dictionary) -> void:
 	if multiplayer.is_server():
 		enemy_spawner.spawn(config)
+
+
+# ── Spell-hit resolution (host-only; forwards to the Reactions node) ──────────
+# Thin forwarders so projectiles call a stable Main surface (mirrors apply_player_damage /
+# spawn_projectile). Reactions owns the damage routing + element reactions + cosmetic broadcasts.
+
+func resolve_spell_hit(victim: Node, params: Dictionary, caster_peer: int) -> void:
+	if not multiplayer.is_server():
+		return
+	var reactions := get_node_or_null("Reactions")
+	if reactions:
+		reactions.apply_hit(victim, params, caster_peer)
+
+
+func resolve_spell_burst(center: Vector3, radius: float, params: Dictionary, caster_peer: int) -> void:
+	if not multiplayer.is_server():
+		return
+	var reactions := get_node_or_null("Reactions")
+	if reactions:
+		reactions.apply_burst(center, radius, params, caster_peer)
 
 
 ## Called on the host by a projectile hit. Health is host-authoritative: the host computes
