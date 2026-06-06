@@ -7,6 +7,19 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ---
 
+## 2026-06-06 (casting feedback + console)
+
+*Playtest-prep polish from user feedback*
+
+### ⚙️ Under the Hood
+
+- **Clients can open the dev console now.** It mounts on every peer and gates by role: the host keeps
+  the full command set, a client gets `help`/`clear` (host-only commands print "host only"), with a
+  `_HOST_ONLY` seam ready for future client-side commands. Each peer's console suspends only its own
+  input while open (already per-peer).
+
+---
+
 ## 2026-06-06 (scope pass)
 
 *Trimmed the slice toward the playtest, after two external reviews*

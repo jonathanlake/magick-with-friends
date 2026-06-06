@@ -282,9 +282,11 @@ ui/
   hud/                        — DEV debug HUD (CanvasLayer): spell + HP + enemy/player counts + FPS
                                 readout, crosshair, death fade, host-left + self-damage overlays.
                                 (Proximity swap prompt is roadmap.)
-  console/                    — dev_console.gd: host-only dev console (backtick). Commands:
-                                help / start (begin the round) / players / wave /
-                                enemies [off|on|clear] / clear. Mounted host-only in main.gd. BUILT.
+  console/                    — dev_console.gd: dev console (backtick). Mounted on EVERY peer in
+                                main.gd, gated by role: HOST gets the full set (help / start /
+                                give [all] / players / wave / enemies [off|on|clear] / clear); a
+                                CLIENT gets only help / clear (host-only cmds print "host only"),
+                                with a seam (`_HOST_ONLY`) for future client-side commands. BUILT.
 
 debug/
   debug.gd                    — Dev-only helper. DEBUG autoload, DISABLED by default. Two-window
