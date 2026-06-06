@@ -70,12 +70,11 @@ not the per-pixel simulation).
   playtests show input lag. The split is *decided*; fully *formalizing* it in code (enemies / waves /
   pickups / reactions) is a post-slice task, done as those systems land.
 
-- **Player movement controller → `CharacterBody3D`.** Was open (keep `RigidBody3D` for the
-  physics-chaos tone vs. migrate); now **decided: migrate to `CharacterBody3D`** — crisper,
-  more standard FP feel, and it fixes the airborne wall-stick the RigidBody force-model causes.
-  Physics-chaos (knockback, ragdoll, getting shoved) becomes **deliberate scripted** effects rather
-  than emergent jank. **Implementation deferred to its own PR** — the player is `RigidBody3D` in code
-  until then. **Enemies** are already `CharacterBody3D`.
+- **Player movement controller → `CharacterBody3D`. ✅ DONE.** Migrated from `RigidBody3D` (was open;
+  decided; now implemented) — crisper, more standard FP feel, and the airborne wall-stick is gone
+  (`move_and_slide` slides along walls). Physics-chaos (knockback, ragdoll, getting shoved) becomes
+  **deliberate scripted** effects rather than emergent jank — a follow-up, none implemented yet.
+  **Enemies** are also `CharacterBody3D`.
 
 **Still open (DECIDE LATER — do not invent these):**
 

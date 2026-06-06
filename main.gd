@@ -209,4 +209,4 @@ func _respawn_player(victim_peer: int) -> void:
 	# The victim's own machine teleports its own player (robust to authority config).
 	if multiplayer.get_unique_id() == victim_peer:
 		player.global_position = player_spawn_position.global_position
-		player.linear_velocity = Vector3.ZERO
+		player.velocity = Vector3.ZERO

@@ -1,15 +1,15 @@
 class_name Player
-extends RigidBody3D
+extends CharacterBody3D
 
-# friction-terminal speed = move_force / ground_friction = 15 u/s, above max_speed, so max_speed
-# is the real binding cap (reached snappily). ~12 u/s ≈ the prior feel and ~3× the 4 u/s enemy
-# speed, so players can kite the horde.
-@export var move_force: float = 120.0
-@export var max_speed: float = 12.0
-@export var ground_friction: float = 8.0
-@export var jump_force: float = 7.0
-@export var jump_gravity_multiplier: float = 2.5   # extra gravity while rising
-@export var fall_gravity_multiplier: float = 3.0   # extra gravity while falling
+# Velocity-model first-person controller. max_speed is the hard horizontal cap; acceleration /
+# ground_deceleration are how fast we reach it / stop. ~6 u/s vs the 4 u/s enemy speed lets players
+# kite the horde. Tune these in playtest.
+@export var max_speed: float = 6.0
+@export var acceleration: float = 60.0          # units/sec² toward the wish velocity
+@export var ground_deceleration: float = 50.0   # units/sec² toward zero when no input
+@export var jump_velocity: float = 6.0          # initial upward velocity on jump
+@export var jump_gravity_multiplier: float = 2.5   # extra gravity while rising (snappier apex)
+@export var fall_gravity_multiplier: float = 3.0   # extra gravity while falling (weightier landing)
 @export var camera_height: float = 0.75
 @export var camera_smoothing: float = 15.0
 @export var mouse_sensitivity: float = 0.003
@@ -27,8 +27,8 @@ var form_idx: int = 0
 var element_idx: int = 0
 # Replicated look-yaw (the player's aim direction). The owning peer writes it from the camera each
 # frame; the player MultiplayerSynchronizer replicates it outward (see player.tscn) so remote copies
-# can face the model where the player is actually looking. The body is angular-locked and never
-# rotates, so we rotate the Visual node by this instead.
+# can face the model where the player is actually looking. The body itself is never rotated (the
+# camera handles look), so we rotate the Visual node by this instead.
 var aim_yaw: float = 0.0
 # Replicated planar speed (world units/sec), authored by the owning peer from its real velocity and
 # synced outward (see player.tscn). The Visual's LocomotionAnimator blends idle<->run from THIS
@@ -44,7 +44,6 @@ var anim_speed: float = 0.0
 # local first-person player; shown for remote copies so teammates see this player's body. Also
 # rotated by aim_yaw so the model faces the look direction.
 @onready var _visual: Node3D = $Visual
-@onready var _ground_check: RayCast3D = $GroundCheck
 
 var _camera_yaw: float = 0.0
 var _camera_pitch: float = 0.0
@@ -147,54 +146,54 @@ func _process(delta: float) -> void:
 		_wand.try_cast(_camera.global_position + aim * 0.6, aim)
 
 
-func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
+# Owning-peer movement on the physics clock. CharacterBody3D velocity model: gravity + jump on Y,
+# accelerate/decelerate the horizontal toward the wish velocity, then move_and_slide() (which slides
+# along walls — no airborne wall-stick, the reason for the switch from RigidBody3D).
+func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
 		return
 	if _dead:
-		return  # frozen while dead; anim_speed is zeroed in set_dead() (this never runs frozen)
-
-	# Horizontal-only friction — Y axis left free for gravity and jumps.
-	var vel := state.linear_velocity
-	var friction := maxf(0.0, 1.0 - ground_friction * state.step)
-	state.linear_velocity = Vector3(vel.x * friction, vel.y, vel.z * friction)
-
-	# Author our planar speed from real velocity for the locomotion blend; the synchronizer
-	# replicates it so remote copies animate from a steady value, not a stepped position.
-	anim_speed = Vector2(state.linear_velocity.x, state.linear_velocity.z).length()
-
-	if _jump_queued and _ground_check.is_colliding():
-		state.apply_central_impulse(Vector3.UP * jump_force)
-		_jump_queued = false
-
-	# Asymmetric gravity: snappier rise, weightier fall.
-	if not _ground_check.is_colliding():
-		if state.linear_velocity.y > 0.0:
-			state.apply_central_force(state.total_gravity * mass * (jump_gravity_multiplier - 1.0))
-		elif state.linear_velocity.y < 0.0:
-			state.apply_central_force(state.total_gravity * mass * (fall_gravity_multiplier - 1.0))
-
-	var input_dir := _input_sync.movement_vector
-	if input_dir == Vector2.ZERO:
+		velocity = Vector3.ZERO  # stay put while down (anim_speed is zeroed in set_dead)
 		return
 
+	# Asymmetric gravity: snappier rise, weightier fall. get_gravity().y is negative.
+	if not is_on_floor():
+		var mult := jump_gravity_multiplier if velocity.y > 0.0 else fall_gravity_multiplier
+		velocity.y += get_gravity().y * mult * delta
+
+	# Clear only on fire, so a jump pressed just before landing still buffers (matches prior feel).
+	if _jump_queued and is_on_floor():
+		velocity.y = jump_velocity
+		_jump_queued = false
+
+	# Horizontal: ease velocity toward the wish (input × camera yaw), or toward zero when idle.
+	var input_dir := _input_sync.movement_vector
 	var forward := Vector3(-sin(_camera_yaw), 0.0, -cos(_camera_yaw))
 	var right := Vector3(cos(_camera_yaw), 0.0, -sin(_camera_yaw))
-	var move_dir := (forward * (-input_dir.y) + right * input_dir.x).normalized()
+	var wish := (forward * (-input_dir.y) + right * input_dir.x).limit_length(1.0)
+	if wish != Vector3.ZERO:
+		var target := wish * max_speed
+		velocity.x = move_toward(velocity.x, target.x, acceleration * delta)
+		velocity.z = move_toward(velocity.z, target.z, acceleration * delta)
+	else:
+		velocity.x = move_toward(velocity.x, 0.0, ground_deceleration * delta)
+		velocity.z = move_toward(velocity.z, 0.0, ground_deceleration * delta)
 
-	var hspeed := Vector3(state.linear_velocity.x, 0.0, state.linear_velocity.z).length()
-	if hspeed < max_speed:
-		state.apply_central_force(move_dir * move_force)
+	move_and_slide()
+
+	# Author planar speed from the RESOLVED velocity (post-slide), replicated so remote copies blend
+	# from a steady value. After the slide so a wall-pinned player reads ~0, not a phantom run.
+	anim_speed = Vector2(velocity.x, velocity.z).length()
 
 
-## Toggled by Main on death / respawn. Hides + freezes the body and gates input.
+## Toggled by Main on death / respawn. Hides the body + gates movement/input.
 func set_dead(dead: bool) -> void:
 	_dead = dead
-	freeze = dead
 	if dead:
-		# Zero the locomotion driver HERE: freezing the body stops _integrate_forces, so its
-		# dead-branch anim_speed reset never runs. Without this the last (possibly running) speed
-		# stays replicated and a stale run pose flashes on the remote copy at respawn.
+		# _physics_process zeroes velocity + skips move_and_slide while dead; reset the replicated
+		# locomotion driver too so a stale (possibly running) blend doesn't flash on respawn.
 		anim_speed = 0.0
+		velocity = Vector3.ZERO
 		_visual.visible = false
 		_name_label.visible = false
 	else:

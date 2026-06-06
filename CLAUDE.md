@@ -45,11 +45,10 @@ Near-term the spell game is the focus; long-term this split is what enables the 
 - **No C# toolchain.** No `.csproj`, no `dotnet`, no NuGet.
 - **Do not modify UIDs** in `.tscn` or `.gd.uid` files manually (the editor generates them).
 - **@export everything tunable.** Any value a non-coder might want to change must be `@export`.
-- **Enemies are `CharacterBody3D`** (kinematic, `move_and_slide`-driven). **Physics-chaos —
-  ragdolls, knockback, slips — is the embraced tone**, so `RigidBody3D` is fine for props. (The
-  player's controller is **`RigidBody3D` today**, but the switch to `CharacterBody3D` is now
-  **decided** — deferred to its own PR; see `DESIGN.md`. Physics-chaos becomes deliberate scripted
-  knockback/ragdoll after the switch.)
+- **Players and enemies are `CharacterBody3D`** (kinematic, `move_and_slide`-driven). `RigidBody3D`
+  is fine for props. **Physics-chaos — ragdolls, knockback, slips — is the embraced tone**, but with
+  kinematic bodies it's **deliberate scripted** effects (manual velocity / a ragdoll on death), not
+  emergent rigid-body jank.
 - **Component pattern.** Behavior goes in component nodes, not monolithic scripts.
 - **Event bus pattern.** Cross-system communication goes through `GameEvents` signals.
   No direct node references across unrelated systems.
@@ -247,13 +246,13 @@ components/
 
 entities/
   player/
-    player.gd                 — First-person RigidBody3D controller: run / jump / look / cast /
-                                death-state. Authors replicated `aim_yaw` + `anim_speed` and feeds
-                                the Visual's animator each frame. Climbing/parkour removed.
+    player.gd                 — First-person CharacterBody3D controller: run / jump / look / cast /
+                                death-state (velocity + move_and_slide + is_on_floor). Authors
+                                replicated `aim_yaw` + `anim_speed` and feeds the Visual's animator
+                                each frame. Climbing/parkour removed.
     player.tscn               — FP body, InputSync, MultiplayerSynchronizer, HealthComponent,
                                 HitFlashComponent, a `Visual` instance of player_visual.tscn,
-                                capsule collider, NameLabel, GroundCheck, camera. (WandComponent
-                                is added in code.)
+                                capsule collider, NameLabel, camera. (WandComponent is added in code.)
     player_visual.tscn        — The visible rig: KayKit Mage (.glb) + an AnimationTree (idle↔run
                                 BlendSpace1D) + LocomotionAnimator. Editable art/anim scene. BUILT.
   projectiles/                — projectile.gd/.tscn: host-spawned + host-resolved spell
@@ -454,11 +453,12 @@ backup — private solo repo). The committed visual scenes (`player_visual.tscn`
 headless gate assumes the assets are present locally.
 
 ### Physics (Jolt)
-- **Enemies** are `CharacterBody3D` — `move_and_slide()` after setting `velocity`; gravity via
-  `get_gravity()`; `is_on_floor()` for grounded. Knockback = add to `velocity`.
-- **Player** is `RigidBody3D` (first-person); knockback there is an impulse.
-- **Physics-chaos is a feature** of the friend-slop tone — keep gameplay-critical physics on a
-  single owner; let purely-cosmetic chaos be loose. `RigidBody3D` is fine for physics props.
+- **Players and enemies** are `CharacterBody3D` — set `velocity` then `move_and_slide()`; gravity via
+  `get_gravity()`; `is_on_floor()` for grounded. Knockback = add to `velocity`. The player uses an
+  asymmetric-gravity jump (rise/fall multipliers) + `move_toward` accel/decel; `move_and_slide` slides
+  along walls (no airborne wall-stick).
+- **Physics-chaos is a feature** of the friend-slop tone, but with kinematic bodies it's **scripted**
+  (manual knockback velocity, a ragdoll swap on death). `RigidBody3D` is fine for purely-cosmetic props.
 - Jolt is the engine (`project.godot`); test with Jolt enabled — its collision response differs.
 
 ### Camera Rig Pattern (First-Person)
@@ -477,10 +477,10 @@ two hand-rolled `grab_focus` workarounds failed before a doc check found the one
 
 ## Known Issues / Watch Out For
 
-- **Player controller is `RigidBody3D` (first-person) — for now.** The switch to `CharacterBody3D`
-  is **decided** (crisper feel, fixes the airborne wall-stick) but **not yet implemented** — it's its
-  own deferred PR (`DESIGN.md`). The `_integrate_forces`/force-and-friction movement specifics in the
-  Physics convention below get rewritten then; don't assume RigidBody3D in new player-agnostic code.
+- **Player controller is `CharacterBody3D` (first-person).** Switched from RigidBody3D — crisper feel,
+  and the airborne wall-stick is gone (move_and_slide slides along walls). Movement is velocity-model
+  in `player.gd._physics_process` (gravity + jump on Y, `move_toward` accel/decel on the horizontal).
+  Emergent rigid-body shoving is gone by design — knockback/ragdoll are now scripted (a follow-up).
 - **Cast feel is host-asymmetric.** The host feels instant casts; clients eat a round-trip. The
   local cosmetic muzzle flash masks it; read playtests knowing host feel ≠ client feel (rotate hosts).
 - **Damage-value timing is host-asymmetric (distinct from cast feel above — that's latency, this is
@@ -504,9 +504,9 @@ two hand-rolled `grab_focus` workarounds failed before a doc check found the one
   `collision_layer = 4`, not 3. Assignments:
   - **world** (CSG floor + walls): `collision_layer = 1`, `collision_mask = 0` (static; bodies collide
     *into* it via their masks).
-  - **player** (`player.tscn` RigidBody3D): `collision_layer = 2`, `collision_mask = 7`
-    (world+players+enemies — keeps the player↔player and player↔enemy shoving chaos). `GroundCheck`
-    ray is `collision_mask = 1` (world only).
+  - **player** (`player.tscn` CharacterBody3D): `collision_layer = 2`, `collision_mask = 7`
+    (world+players+enemies — players + enemies block each other; grounded via `is_on_floor()`, no
+    separate GroundCheck ray).
   - **enemy** (`enemy_base.tscn` CharacterBody3D): `collision_layer = 4`, `collision_mask = 7`
     (world+players+enemies — enemies collide with the arena, players, and each other so they don't stack).
   - **projectile** (`projectile.tscn` Area3D): `collision_layer = 8`, `collision_mask = 6`
