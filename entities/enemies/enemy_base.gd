@@ -70,7 +70,7 @@ func _physics_process(delta: float) -> void:
 				velocity.x = 0.0
 				velocity.z = 0.0
 		_attack_timer -= delta
-		if dist <= melee_range and _attack_timer <= 0.0:
+		if dist <= melee_range and _attack_timer <= 0.0 and _health.current_health > 0:
 			_attack_timer = attack_cooldown_sec
 			play_attack_anim.rpc()  # cosmetic swing on every peer (host owns the enemy)
 			# Player damage is host-authoritative and routed through Main (RPC health sync).
@@ -80,9 +80,12 @@ func _physics_process(delta: float) -> void:
 		velocity.x = 0.0
 		velocity.z = 0.0
 
-	# Author the locomotion speed from real horizontal velocity (replicated for clients).
-	anim_speed = Vector2(velocity.x, velocity.z).length()
 	move_and_slide()
+	# Author the locomotion speed from the RESOLVED horizontal velocity (move_and_slide updates
+	# `velocity` to the post-collision value), replicated for clients. Authoring it before the slide
+	# would read the commanded speed, so an enemy blocked against a wall / stacked behind others would
+	# play the run cycle while standing still.
+	anim_speed = Vector2(velocity.x, velocity.z).length()
 
 
 # Cosmetic, every peer: drive the visual from the (host-authored, replicated) anim drivers. Runs on

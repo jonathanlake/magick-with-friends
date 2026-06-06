@@ -151,8 +151,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	if not is_multiplayer_authority():
 		return
 	if _dead:
-		anim_speed = 0.0  # replicated -> remote copies blend to idle while we're down
-		return
+		return  # frozen while dead; anim_speed is zeroed in set_dead() (this never runs frozen)
 
 	# Horizontal-only friction — Y axis left free for gravity and jumps.
 	var vel := state.linear_velocity
@@ -192,6 +191,10 @@ func set_dead(dead: bool) -> void:
 	_dead = dead
 	freeze = dead
 	if dead:
+		# Zero the locomotion driver HERE: freezing the body stops _integrate_forces, so its
+		# dead-branch anim_speed reset never runs. Without this the last (possibly running) speed
+		# stays replicated and a stale run pose flashes on the remote copy at respawn.
+		anim_speed = 0.0
 		_visual.visible = false
 		_name_label.visible = false
 	else:
