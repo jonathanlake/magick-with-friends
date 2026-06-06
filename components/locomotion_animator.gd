@@ -11,6 +11,12 @@ extends Node3D
 ## position delta and feeds the same BlendSpace1D. No new replicated fields, no RPCs — purely local
 ## presentation, identical on all machines.
 ##
+## Sampling runs in _physics_process, NOT _process: the body moves on the physics clock (the local
+## player in _integrate_forces, remote players via their MultiplayerSynchronizer on the physics
+## step), so reading position there gives a clean, fixed-step speed. Sampling in _process (render
+## rate) instead reads stair-stepped positions — some frames zero motion, the next a doubled jump —
+## which makes the derived speed flicker, jittering the blend (most visible at the staff tip).
+##
 ## Wiring uses NodePath exports resolved in _ready (typed-node @exports do NOT resolve from a hand-
 ## authored .tscn — they come back null; see CLAUDE.md). Looping on the Idle/Run clips is set in the
 ## glb import dock (one-time author action), not here.
@@ -36,14 +42,14 @@ func _ready() -> void:
 	_tree = get_node_or_null(animation_tree_path) as AnimationTree
 	if _tree == null:
 		push_warning("LocomotionAnimator: no AnimationTree at %s" % [animation_tree_path])
-		set_process(false)
+		set_physics_process(false)
 		return
 	_tree.active = true
 	_last_pos = global_position
 	_has_last_pos = true
 
 
-func _process(delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	if _tree == null or delta <= 0.0:
 		return
 
