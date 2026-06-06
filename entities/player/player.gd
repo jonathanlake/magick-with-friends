@@ -30,6 +30,11 @@ var element_idx: int = 0
 # can face the model where the player is actually looking. The body is angular-locked and never
 # rotates, so we rotate the Visual node by this instead.
 var aim_yaw: float = 0.0
+# Replicated planar speed (world units/sec), authored by the owning peer from its real velocity and
+# synced outward (see player.tscn). The Visual's LocomotionAnimator blends idle<->run from THIS
+# instead of differentiating position, so remote copies get a steady value rather than a stepped
+# network snapshot (which sawtooths the blend — the staff jitter). See locomotion_animator.gd.
+var anim_speed: float = 0.0
 
 @onready var _input_sync: PlayerInputSynchronizerComponent = $PlayerInputSynchronizerComponent
 @onready var _camera_rig: Node3D = $CameraRig
@@ -107,9 +112,12 @@ func _input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	if not is_multiplayer_authority():
-		# Remote copy: orient the visible model to the replicated look-yaw (body is angular-locked).
+		# Remote copy: orient the visible model to the replicated look-yaw (body is angular-locked),
+		# and feed it the replicated speed (steady value -> no remote blend jitter).
 		if _visual:
 			_visual.rotation.y = aim_yaw
+			if _visual.has_method("feed_speed"):
+				_visual.feed_speed(anim_speed)
 		return
 
 	var target := global_position + Vector3(0.0, camera_height, 0.0)
@@ -121,6 +129,8 @@ func _process(delta: float) -> void:
 	aim_yaw = _camera_yaw
 	if _visual:
 		_visual.rotation.y = aim_yaw
+		if _visual.has_method("feed_speed"):
+			_visual.feed_speed(anim_speed)
 
 	if _dead:
 		return
@@ -141,12 +151,17 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	if not is_multiplayer_authority():
 		return
 	if _dead:
+		anim_speed = 0.0  # replicated -> remote copies blend to idle while we're down
 		return
 
 	# Horizontal-only friction — Y axis left free for gravity and jumps.
 	var vel := state.linear_velocity
 	var friction := maxf(0.0, 1.0 - ground_friction * state.step)
 	state.linear_velocity = Vector3(vel.x * friction, vel.y, vel.z * friction)
+
+	# Author our planar speed from real velocity for the locomotion blend; the synchronizer
+	# replicates it so remote copies animate from a steady value, not a stepped position.
+	anim_speed = Vector2(state.linear_velocity.x, state.linear_velocity.z).length()
 
 	if _jump_queued and _ground_check.is_colliding():
 		state.apply_central_impulse(Vector3.UP * jump_force)

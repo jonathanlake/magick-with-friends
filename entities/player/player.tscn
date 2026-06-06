@@ -4,7 +4,7 @@
 [ext_resource type="PackedScene" uid="uid://cvfl2msql7gnl" path="res://components/player_input_synchronizer_component.tscn" id="2_sglur"]
 [ext_resource type="PackedScene" uid="uid://bsde65brylo0j" path="res://components/health_component.tscn" id="3_bls4j"]
 [ext_resource type="PackedScene" path="res://components/hit_flash_component.tscn" id="4_hitflash"]
-[ext_resource type="PackedScene" path="res://entities/player/player_visual.tscn" id="5_visual"]
+[ext_resource type="PackedScene" uid="uid://cg1pvs3eyq42f" path="res://entities/player/player_visual.tscn" id="5_visual"]
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_symyc"]
 properties/0/path = NodePath(".:global_position")
@@ -13,10 +13,12 @@ properties/0/replication_mode = 1
 properties/1/path = NodePath(".:aim_yaw")
 properties/1/spawn = true
 properties/1/replication_mode = 1
+properties/2/path = NodePath(".:anim_speed")
+properties/2/spawn = true
+properties/2/replication_mode = 1
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_player"]
-radius = 0.4
-height = 1.8
+height = 2.4
 
 [node name="Player" type="RigidBody3D" unique_id=488419291]
 collision_layer = 2
@@ -25,6 +27,7 @@ axis_lock_angular_x = true
 axis_lock_angular_y = true
 axis_lock_angular_z = true
 script = ExtResource("1_symyc")
+max_speed = 6.0
 
 [node name="PlayerInputSynchronizerComponent" parent="." unique_id=1665501618 instance=ExtResource("2_sglur")]
 
@@ -41,7 +44,9 @@ health_component_path = NodePath("../HealthComponent")
 [node name="Visual" parent="." unique_id=2129754114 instance=ExtResource("5_visual")]
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=973207930]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.3, 0)
 shape = SubResource("CapsuleShape3D_player")
+debug_color = Color(0.8117647, 0, 0.9254902, 1)
 
 [node name="NameLabel" type="Label3D" parent="." unique_id=2121726113]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1, 0)
