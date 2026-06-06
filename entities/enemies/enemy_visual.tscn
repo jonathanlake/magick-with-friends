@@ -1,8 +1,47 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="PackedScene" uid="uid://dljkcvimb8oiu" path="res://assets/models/skeleton_minion/skeleton_minion.glb" id="1_skel"]
+[ext_resource type="Script" path="res://components/locomotion_animator.gd" id="2_anim"]
+
+[sub_resource type="AnimationNodeAnimation" id="Anim_idle"]
+animation = &"Idle"
+
+[sub_resource type="AnimationNodeAnimation" id="Anim_run"]
+animation = &"Running_A"
+
+[sub_resource type="AnimationNodeAnimation" id="Anim_attack"]
+animation = &"1H_Melee_Attack_Chop"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="BlendSpace1D_loco"]
+blend_point_0/node = SubResource("Anim_idle")
+blend_point_0/pos = 0.0
+blend_point_1/node = SubResource("Anim_run")
+blend_point_1/pos = 1.0
+min_space = 0.0
+max_space = 4.0
+
+[sub_resource type="AnimationNodeOneShot" id="OneShot_attack"]
+
+[sub_resource type="AnimationNodeBlendTree" id="BlendTree_enemy"]
+nodes/Loco/node = SubResource("BlendSpace1D_loco")
+nodes/Loco/position = Vector2(0, 0)
+nodes/Attack/node = SubResource("Anim_attack")
+nodes/Attack/position = Vector2(0, 160)
+nodes/OneShot/node = SubResource("OneShot_attack")
+nodes/OneShot/position = Vector2(280, 60)
+node_connections = [&"output", 0, &"OneShot", &"OneShot", 0, &"Loco", &"OneShot", 1, &"Attack"]
 
 [node name="EnemyVisual" type="Node3D"]
+script = ExtResource("2_anim")
+animation_tree_path = NodePath("AnimationTree")
+run_speed = 4.0
+blend_param = "parameters/Loco/blend_position"
+oneshot_request_param = "parameters/OneShot/request"
 
 [node name="skeleton" parent="." instance=ExtResource("1_skel")]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, -0.9, 0)
+
+[node name="AnimationTree" type="AnimationTree" parent="."]
+tree_root = SubResource("BlendTree_enemy")
+anim_player = NodePath("../skeleton/AnimationPlayer")
+active = false

@@ -32,8 +32,12 @@ extends Node3D
 ## Per-second smoothing rate for the blend value — damps the noisy per-frame position delta so the
 ## idle<->run transition reads smoothly. Higher = snappier, lower = floatier.
 @export var blend_smoothing: float = 10.0
-## BlendSpace1D blend parameter on the AnimationTree.
+## BlendSpace1D blend parameter on the AnimationTree. For a bare BlendSpace1D root (player) this is
+## "parameters/blend_position"; nested in a BlendTree (enemy) it's "parameters/<NodeName>/blend_position".
 @export var blend_param: String = "parameters/blend_position"
+## Optional OneShot request parameter (e.g. "parameters/OneShot/request") for a one-shot layered over
+## locomotion (the enemy attack). Empty = no one-shot, so fire_oneshot() is a no-op (the player).
+@export var oneshot_request_param: String = ""
 
 var _tree: AnimationTree
 var _last_pos: Vector3
@@ -61,6 +65,14 @@ func _ready() -> void:
 func feed_speed(speed: float) -> void:
 	_external_speed = speed
 	_use_external = true
+
+
+## Fire the configured OneShot (the attack swing), crossfading it over whatever locomotion is playing
+## and fading back when it ends. No-op when oneshot_request_param is unset. Cosmetic; callers invoke
+## it on every peer (e.g. via a host-broadcast RPC) so the swing shows everywhere.
+func fire_oneshot() -> void:
+	if _tree != null and oneshot_request_param != "":
+		_tree.set(oneshot_request_param, AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
 
 
 func _physics_process(delta: float) -> void:
