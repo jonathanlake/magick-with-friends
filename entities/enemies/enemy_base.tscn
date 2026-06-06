@@ -1,13 +1,13 @@
-[gd_scene load_steps=7 format=3]
+[gd_scene format=3 uid="uid://bwc6x2oqeqlj2"]
 
-[ext_resource type="Script" path="res://entities/enemies/enemy_base.gd" id="1_enemy"]
+[ext_resource type="Script" uid="uid://ue6wwiaaqpqu" path="res://entities/enemies/enemy_base.gd" id="1_enemy"]
 [ext_resource type="PackedScene" uid="uid://bsde65brylo0j" path="res://components/health_component.tscn" id="2_health"]
 [ext_resource type="PackedScene" path="res://components/hit_flash_component.tscn" id="3_hitflash"]
 [ext_resource type="PackedScene" path="res://entities/enemies/enemy_visual.tscn" id="4_visual"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_enemy"]
 radius = 0.4
-height = 1.8
+height = 2.1
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_enemy"]
 properties/0/path = NodePath(".:global_position")
@@ -20,24 +20,24 @@ properties/2/path = NodePath(".:face_yaw")
 properties/2/spawn = true
 properties/2/replication_mode = 1
 
-[node name="EnemyBase" type="CharacterBody3D"]
+[node name="EnemyBase" type="CharacterBody3D" unique_id=1117815477]
 collision_layer = 4
 collision_mask = 7
 script = ExtResource("1_enemy")
 
-[node name="Visual" parent="." instance=ExtResource("4_visual")]
+[node name="Visual" parent="." unique_id=1932204030 instance=ExtResource("4_visual")]
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=477246250]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.2, 0)
 shape = SubResource("CapsuleShape3D_enemy")
 
-[node name="HealthComponent" parent="." instance=ExtResource("2_health")]
+[node name="HealthComponent" parent="." unique_id=1667360113 instance=ExtResource("2_health")]
 max_health = 40
 
-[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="."]
+[node name="MultiplayerSynchronizer" type="MultiplayerSynchronizer" parent="." unique_id=1377494686]
 replication_config = SubResource("SceneReplicationConfig_enemy")
 
-[node name="HitFlashComponent" parent="." instance=ExtResource("3_hitflash")]
+[node name="HitFlashComponent" parent="." unique_id=647287636 instance=ExtResource("3_hitflash")]
 target_root_path = NodePath("../Visual")
-health_component_path = NodePath("../HealthComponent")
 flash_color = Color(1, 0.5, 0, 1)
-flash_duration_sec = 0.3
+health_component_path = NodePath("../HealthComponent")
