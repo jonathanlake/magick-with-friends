@@ -58,13 +58,15 @@ func _run(line: String) -> void:
 	var cmd := parts[0].to_lower()
 	match cmd:
 		"help":
-			_println("commands: help, players, wave, clear")
+			_println("commands: help, players, wave, enemies [off|on|clear], clear")
 		"clear":
 			_output.clear()
 		"players":
 			_cmd_players()
 		"wave":
 			_cmd_wave()
+		"enemies":
+			_cmd_enemies(parts)
 		_:
 			_println("unknown command: %s (try help)" % cmd)
 
@@ -85,6 +87,42 @@ func _cmd_wave() -> void:
 	var director := main.get_node_or_null("WaveDirector")
 	var wave_txt: String = str(director.current_wave()) if director and director.has_method("current_wave") else "?"
 	_println("  wave %s, %d enemies alive" % [wave_txt, GameEvents.alive_enemy_count])
+
+
+# enemies off  -> pause wave spawning + clear the living. enemies on -> resume. enemies clear -> just clear.
+func _cmd_enemies(parts: PackedStringArray) -> void:
+	var main := get_parent()
+	var director := main.get_node_or_null("WaveDirector")
+	var arg: String = parts[1].to_lower() if parts.size() > 1 else ""
+	match arg:
+		"off":
+			if director and director.has_method("set_spawning"):
+				director.set_spawning(false)
+			_println("  enemies OFF — spawning paused, cleared %d" % _clear_enemies(main))
+		"on":
+			if director and director.has_method("set_spawning"):
+				director.set_spawning(true)
+			_println("  enemies ON — spawning resumed")
+		"clear":
+			_println("  cleared %d enemies (spawning unchanged)" % _clear_enemies(main))
+		_:
+			var state := "?"
+			if director and director.has_method("is_spawning"):
+				state = "on" if director.is_spawning() else "off"
+			_println("  usage: enemies off | on | clear  (spawning %s, %d alive)" % [state, GameEvents.alive_enemy_count])
+
+
+# Free every spawned enemy (host-authoritative; queue_free replicates the removal to clients, and each
+# enemy's _exit_tree unregisters it from the live count). Returns how many were cleared.
+func _clear_enemies(main: Node) -> int:
+	var container := main.get_node_or_null("Enemies")
+	if container == null:
+		return 0
+	var n := 0
+	for e in container.get_children():
+		e.queue_free()
+		n += 1
+	return n
 
 
 func _println(s: String) -> void:
