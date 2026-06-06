@@ -9,6 +9,9 @@ animation = &"Idle"
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_run"]
 animation = &"Running_A"
 
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_cast"]
+animation = &"Spellcast_Shoot"
+
 [sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_loco"]
 blend_point_0/node = SubResource("AnimationNodeAnimation_idle")
 blend_point_0/pos = 0.0
@@ -17,10 +20,23 @@ blend_point_1/pos = 1.0
 min_space = 0.0
 value_label = "speed"
 
+[sub_resource type="AnimationNodeOneShot" id="OneShot_cast"]
+
+[sub_resource type="AnimationNodeBlendTree" id="BlendTree_player"]
+nodes/Loco/node = SubResource("AnimationNodeBlendSpace1D_loco")
+nodes/Loco/position = Vector2(0, 0)
+nodes/Cast/node = SubResource("AnimationNodeAnimation_cast")
+nodes/Cast/position = Vector2(0, 160)
+nodes/OneShot/node = SubResource("OneShot_cast")
+nodes/OneShot/position = Vector2(280, 60)
+node_connections = [&"output", 0, &"OneShot", &"OneShot", 0, &"Loco", &"OneShot", 1, &"Cast"]
+
 [node name="PlayerVisual" type="Node3D" unique_id=2140237841]
 script = ExtResource("2_anim")
 animation_tree_path = NodePath("AnimationTree")
 run_speed = 6.0
+blend_param = "parameters/Loco/blend_position"
+oneshot_request_param = "parameters/OneShot/request"
 
 [node name="mage" parent="." unique_id=268867569 instance=ExtResource("1_mage")]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, -0.9, 0)
@@ -28,6 +44,5 @@ transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, -0.9, 0)
 [node name="AnimationTree" type="AnimationTree" parent="." unique_id=1305289380]
 active = false
 root_node = NodePath("../mage")
-tree_root = SubResource("AnimationNodeBlendSpace1D_loco")
+tree_root = SubResource("BlendTree_player")
 anim_player = NodePath("../mage/AnimationPlayer")
-parameters/blend_position = 0.0

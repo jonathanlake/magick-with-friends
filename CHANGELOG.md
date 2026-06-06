@@ -7,6 +7,21 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ---
 
+## 2026-06-06 (casting feedback + console)
+
+*Playtest-prep polish from user feedback*
+
+### ✨ Features
+
+- **Players cast with a gesture now.** The mage plays a `Spellcast_Shoot` one-shot over locomotion
+  when a cast actually fires — same BlendTree+OneShot shape the skeleton already uses for its attack.
+  Replicated owner→all (cosmetic), so teammates see you cast.
+- **Spells come out of the staff, not your face.** A `Muzzle` Marker3D on the staff (under the camera)
+  is now the projectile + muzzle-flash origin, instead of a point in front of the camera. Aim is still
+  camera-forward; the origin is read on the casting peer and passed to the host spawn.
+
+---
+
 ## 2026-06-06 (scope pass)
 
 *Trimmed the slice toward the playtest, after two external reviews*
