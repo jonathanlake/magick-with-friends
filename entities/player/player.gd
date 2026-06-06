@@ -35,8 +35,9 @@ var aim_yaw: float = 0.0
 @onready var _camera_rig: Node3D = $CameraRig
 @onready var _camera: Camera3D = $CameraRig/Camera3D
 @onready var _name_label: Label3D = $NameLabel
-# The visible body (placeholder capsule, or a swapped-in model — see CharacterVisual). Hidden for the
-# local first-person player; shown for remote copies so teammates see this player's body.
+# The visible body — an instance of player_visual.tscn (the model + animations). Hidden for the
+# local first-person player; shown for remote copies so teammates see this player's body. Also
+# rotated by aim_yaw so the model faces the look direction.
 @onready var _visual: Node3D = $Visual
 @onready var _ground_check: RayCast3D = $GroundCheck
 

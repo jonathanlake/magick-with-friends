@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://cg1pvs3eyq42f"]
+
+[ext_resource type="PackedScene" uid="uid://roymm0vtk6mf" path="res://assets/models/mage/mage.glb" id="1_mage"]
+
+[node name="PlayerVisual" type="Node3D"]
+
+[node name="mage" parent="." instance=ExtResource("1_mage")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, -0.9, 0)
