@@ -1,7 +1,8 @@
 extends CanvasLayer
 
-## Host-only dev console (v1). Toggled with backtick. Read-only commands to ease playtesting:
-## help / players / wave / clear. Mounted only on the host (see main.gd), so it is inherently
+## Host-only dev console (v1). Toggled with backtick. Commands to ease playtesting:
+## help / start / players / wave / enemies / clear. `start` begins the round (the wave director
+## boots paused). Mounted only on the host (see main.gd), so it is inherently
 ## host-only. While open it sets GameManager.console_open (suspends the host's player input —
 ## look/move/cast) and frees the mouse; the world keeps running for everyone (no pause).
 
@@ -58,9 +59,11 @@ func _run(line: String) -> void:
 	var cmd := parts[0].to_lower()
 	match cmd:
 		"help":
-			_println("commands: help, players, wave, enemies [off|on|clear], clear")
+			_println("commands: help, start, players, wave, enemies [off|on|clear], clear")
 		"clear":
 			_output.clear()
+		"start":
+			_cmd_start()
 		"players":
 			_cmd_players()
 		"wave":
@@ -80,6 +83,20 @@ func _cmd_players() -> void:
 			_println("  %s: %s" % [child.name, child.player_name])
 	if count == 0:
 		_println("  (no players)")
+
+
+# Begin the round: un-pause the host's wave director (it boots paused via auto_start=false).
+func _cmd_start() -> void:
+	var main := get_parent()
+	var director := main.get_node_or_null("WaveDirector")
+	if director == null or not director.has_method("set_spawning"):
+		_println("  no WaveDirector — can't start")
+		return
+	if director.has_method("is_spawning") and director.is_spawning():
+		_println("  round already running")
+		return
+	director.set_spawning(true)
+	_println("  round started — the horde is coming")
 
 
 func _cmd_wave() -> void:

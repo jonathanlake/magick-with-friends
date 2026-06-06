@@ -87,5 +87,5 @@ func _run_smoke() -> void:
 		get_tree().quit(0)
 	else:
 		print("SMOKE_FAIL: scene='%s', no host player node named '%s' in the tree" % [
-			(main.name if main else "<none>"), pid])
+			(str(main.name) if main else "<none>"), pid])
 		get_tree().quit(1)

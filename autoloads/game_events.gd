@@ -16,6 +16,12 @@ func emit_enemy_died():
 	enemy_died.emit()
 
 
+# Emit helper so the signal is fired from within its declaring class (clears the UNUSED_SIGNAL
+# warning) and callers have one stable entry point. Fired by the host on the victim's own machine.
+func emit_local_player_damaged() -> void:
+	local_player_damaged.emit()
+
+
 func register_enemy() -> void:
 	alive_enemy_count += 1
 	enemy_count_changed.emit(alive_enemy_count)

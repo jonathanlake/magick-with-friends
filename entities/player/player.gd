@@ -214,6 +214,8 @@ func _cycle_debug_spell() -> void:
 	if total <= 0:
 		return
 	var linear := (_wand.form_idx * ec + _wand.element_idx + 1) % total
+	# Intended integer division: linear / ec is the form index, linear % ec the element index.
+	@warning_ignore("integer_division")
 	_wand.request_set_blend(linear / ec, linear % ec)
 
 
