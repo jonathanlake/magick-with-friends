@@ -97,7 +97,7 @@ PR**, legibility baked into each PR (not deferred). Everything is host-authorita
 reuses the `MultiplayerSpawner` / RPC / `GameEvents` patterns.
 
 1. **Player FP controller cleanup.** ✅ DONE — climbing/parkour removed, LMB → cast,
-   first-person run/jump kept. (RigidBody3D-vs-CharacterBody3D still open.)
+   first-person run/jump kept; migrated to `CharacterBody3D` (see the decided item above).
 2. **Blend spell core + friendly fire + respawn.** ✅ DONE — `Spell`/`SpellForm`/
    `SpellElement`/`BlendSpell` + `WandComponent` (Form+Element slots, `cast_delay_sec`),
    Projectile + Fire, host-authoritative projectile spawn, FF damage on `HealthComponent`
