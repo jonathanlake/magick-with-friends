@@ -177,7 +177,7 @@ func _sync_health(victim_peer: int, value: int) -> void:
 		# apply_player_damage before this runs, so on the host the drop is already baked in — that
 		# asymmetry is exactly why the cue fired on clients but not the host.
 		if multiplayer.get_unique_id() == victim_peer:
-			GameEvents.local_player_damaged.emit()
+			GameEvents.emit_local_player_damaged()
 
 
 func _on_player_died(victim_peer: int) -> void:

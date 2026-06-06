@@ -16,11 +16,15 @@ extends Node
 @export var spawn_ring_radius: float = 9.0
 @export var spawn_height: float = 1.0
 @export var arena_center: Vector3 = Vector3.ZERO
+## When false (default), the horde stays paused at boot until the host begins the round (dev console
+## `start`). The wave loop idles harmlessly until then. Flip true to spawn immediately on load.
+@export var auto_start: bool = false
 
 var _wave_index: int = 0
 var _enemy_counter: int = 0
 # Host-side toggle (dev console). When false, the wave loop idles — no spawns, no wave advance.
-var _spawning_enabled: bool = true
+# Initialized from auto_start in _ready.
+var _spawning_enabled: bool = false
 
 
 # Read-only accessor for the dev console / HUD.
@@ -41,6 +45,7 @@ func _ready() -> void:
 	# Clients run nothing — all spawning is host-authoritative.
 	if not multiplayer.is_server():
 		return
+	_spawning_enabled = auto_start  # paused by default; host begins via the dev console `start`
 	_run_waves()
 
 
