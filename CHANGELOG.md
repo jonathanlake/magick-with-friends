@@ -7,6 +7,59 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ---
 
+## 2026-06-06
+
+*4 PRs merged (#36–#39) — visual scenes + the animation subsystem + the round start-gate*
+
+### ✨ Features
+
+- **Characters animate now.** Players play an idle↔run blend; skeleton enemies idle↔run, **face**
+  their target, and **swing** on melee. Built on one reusable `LocomotionAnimator` + an AnimationTree
+  per visual scene (a OneShot layers the enemy attack over locomotion). (#37, #39)
+- **Separate visual/rig scenes.** The model + AnimationTree live in committed `player_visual.tscn` /
+  `enemy_visual.tscn` that each entity instances — the normal Godot pattern, editable in-editor.
+  Replaced the earlier runtime model-load/capsule-fallback machinery (dropped `CharacterVisual`). (#36)
+- **Round start-gate.** The horde no longer spawns from boot — the wave director boots **paused** and
+  the host types **`start`** in the dev console to begin, so you can set up first. (#38)
+
+### 🛡️ Stability & Netcode
+
+- **Remote-animation jitter, fixed twice.** First the locomotion speed was sampled on the render
+  clock while the body moves on the physics clock (a stair-stepped signal) — moved to
+  `_physics_process`. Then the deeper one: deriving speed by differentiating a *replicated* position
+  is jittery because remote positions arrive in held network snapshots — so we now **replicate the
+  speed/facing driver** itself (the owning peer authors it) and animate locally from that steady
+  value. The idiomatic Godot multiplayer rule: replicate the driver, never the animation state. (#37)
+
+### ⚙️ Under the Hood
+
+- **Cleared 3 GDScript warnings** (unused-signal, integer-division, incompatible-ternary) — benign,
+  but the debugger panel is quiet again so real issues stand out. (#38)
+
+---
+
+## 2026-06-05 (continued)
+
+*6 PRs merged (#30–#35) — combat got real, models came in, docs reframed*
+
+### ✨ Features
+
+- **BLEND became real combat.** A 2×2 **Form × Element** spell matrix with **entity reactions** —
+  lightning chains between nearby units (allies included), fire applies a burn DoT — resolved
+  host-central in `systems/reactions/`, index-stable via a new `SpellCatalog` autoload. (#33)
+- **KayKit character models.** Swapped the placeholder capsules for the **Mage** (player) and
+  **Skeleton** (enemy) art packs, with the hit-flash reworked to tint textured multi-surface meshes
+  via a material overlay. (#34)
+- **Dev console `enemies` toggle.** `enemies off | on | clear` to pause/clear the horde while
+  testing. (#35)
+
+### ⚙️ Under the Hood
+
+- **Docs.** Started this `CHANGELOG`; an accuracy/de-duplication pass across `CLAUDE.md` / `DESIGN.md`;
+  and a light **reframe** naming the reusable multiplayer spine vs. the spell-game built on it. (#30–#32)
+
+---
+
 ## 2026-06-05
 
 *9 PRs merged (#21–#29) · 3 reviews/audits · 2 bugs caught mid-build*

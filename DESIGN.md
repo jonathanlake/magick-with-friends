@@ -70,13 +70,15 @@ not the per-pixel simulation).
   playtests show input lag. The split is *decided*; fully *formalizing* it in code (enemies / waves /
   pickups / reactions) is a post-slice task, done as those systems land.
 
+- **Player movement controller → `CharacterBody3D`.** Was open (keep `RigidBody3D` for the
+  physics-chaos tone vs. migrate); now **decided: migrate to `CharacterBody3D`** — crisper,
+  more standard FP feel, and it fixes the airborne wall-stick the RigidBody force-model causes.
+  Physics-chaos (knockback, ragdoll, getting shoved) becomes **deliberate scripted** effects rather
+  than emergent jank. **Implementation deferred to its own PR** — the player is `RigidBody3D` in code
+  until then. **Enemies** are already `CharacterBody3D`.
+
 **Still open (DECIDE LATER — do not invent these):**
 
-- **Player movement controller.** The player ships a **first-person `RigidBody3D`** controller
-  (run / jump / look / cast; climbing/parkour removed). Whether to keep `RigidBody3D`
-  (physics-chaos — ragdolls, knockback, slips — actually *suits* the friend-slop tone) or
-  migrate to `CharacterBody3D` (snappier, more standard) is **open**. **Enemies** are
-  `CharacterBody3D`.
 - **Run / meta structure** beyond bare wave-survival (stages? mission arc? between-run
   progression?) — **open.** The slice is wave-survival only.
 - **Ability resource.** Per-cast **cooldown** for now; a mana pool (repurpose
@@ -109,10 +111,12 @@ reuses the `MultiplayerSpawner` / RPC / `GameEvents` patterns.
    ring spawner feeding a 3rd `MultiplayerSpawner`. Spells already kill enemies via the existing
    projectile→`HealthComponent` path. Arena flattened to a walled horde box (climbing geometry
    removed). Collision layers now named + explicit (world / players / enemies / projectiles) — see
-   `CLAUDE.md`.
-4. **Blend matrix + reactions + world volumes.** AoE burst + Lightning; reaction table
-   (lightning chain incl. allies, fire burn-spread); 1–2 `Area3D` reactive volumes (oil,
-   water). Distinct per-element VFX as a done-criterion.
+   `CLAUDE.md`. The wave director now **boots paused** — the host begins the round via the dev
+   console `start` (so you can set up before the horde comes).
+4. **Blend matrix + reactions + world volumes.** ✅ MOSTLY BUILT — the **2×2 Form×Element matrix**
+   + **entity reactions** (`systems/reactions/reactions.gd`: lightning chain incl. allies, fire
+   burn/DoT) landed (#33), index-stable via the `SpellCatalog` autoload. **Still pending:** the
+   1–2 `Area3D` world reactive volumes (oil, water) and the distinct per-element VFX done-criterion.
 5. **Wild-cascade A/B (hardcoded) — a *flavor* probe, NOT an engine bake-off.** Blend is the
    **decided engine** (Form × Element, one fused cast) and this A/B cannot move that. Its only
    question: do players want chaos sourced more from the **world** (reactions/physics — blend's
@@ -124,6 +128,12 @@ reuses the `MultiplayerSpawner` / RPC / `GameEvents` patterns.
 6. **Random keep-or-swap acquisition.** Enemy-dropped Form/Element pickups; `interact`
    action; interact-to-swap that drops the old spell as a re-grabbable pickup.
 7. **Legibility tightening pass**, then the 30-minute friend playtest (run as the A/B).
+
+**Presentation (cross-cutting, in progress).** Placeholder capsules retired for **KayKit** models
+(Mage / Skeleton). Players animate idle↔run; skeletons idle↔run + an attack swing, facing their
+target — all driven by one reusable `LocomotionAnimator`, with animation **derived locally from a
+replicated speed/facing driver** (never replicated animation state). See `CLAUDE.md` → Animation.
+Still ahead: spell VFX, wand/hands viewmodel, enemy death animation.
 
 Beyond the slice (only if it proves fun):
 - **GameEvents vocabulary** — replace `enemy_died` with `player_died`, `enemy_died(pos)`,
