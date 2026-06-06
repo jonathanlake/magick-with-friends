@@ -7,6 +7,35 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ---
 
+## 2026-06-06 (continued)
+
+*Player controller migration + review fixes + docs (#40–#42)*
+
+### ✨ Features
+
+- **Player is now a `CharacterBody3D`** (was `RigidBody3D`). Crisper, more standard first-person feel,
+  and the **airborne wall-stick is gone** — `move_and_slide` slides you along walls instead of pinning
+  you. Movement is a clean velocity model (asymmetric-gravity jump + `move_toward` accel/decel). The
+  emergent rigid-body shoving goes away by design; knockback/ragdoll become deliberate scripted
+  effects later. (#42)
+
+### 🛡️ Stability & Netcode
+
+- **Enemy "run-in-place" fixed.** A blocked/stacked skeleton authored its locomotion speed from the
+  *commanded* velocity (before `move_and_slide`), so it played the run cycle while standing still; now
+  read from the resolved velocity. Plus a death-pose reset and an attack-RPC guard. (#41)
+- **Smoke gate now exercises enemies.** Since the wave director boots paused, the headless gate never
+  spawned an enemy — it now spawns one and asserts its AnimationTree is active, so enemy
+  spawn/AI/animation regressions get caught pre-PR. (#41)
+
+### ⚙️ Under the Hood
+
+- **Docs refresh** — brought `CLAUDE.md` / `DESIGN.md` / `CHANGELOG` current through the animation
+  subsystem, visual scenes, reactions, and the start-gate; recorded (now implemented) the
+  CharacterBody3D decision. (#40)
+
+---
+
 ## 2026-06-06
 
 *4 PRs merged (#36–#39) — visual scenes + the animation subsystem + the round start-gate*
