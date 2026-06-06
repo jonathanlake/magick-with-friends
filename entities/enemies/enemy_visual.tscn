@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="PackedScene" uid="uid://dljkcvimb8oiu" path="res://assets/models/skeleton_minion/skeleton_minion.glb" id="1_skel"]
+
+[node name="EnemyVisual" type="Node3D"]
+
+[node name="skeleton" parent="." instance=ExtResource("1_skel")]
+transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, -0.9, 0)

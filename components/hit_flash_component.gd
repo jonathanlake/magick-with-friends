@@ -9,7 +9,7 @@ extends Node
 ## a plain placeholder mesh AND on a textured imported model (KayKit etc.): the overlay renders on top
 ## of the base material, so the texture is preserved, multi-surface meshes all flash, and there's no
 ## cross-instance bleed (material_overlay is per-MeshInstance3D). It re-walks the meshes on every flash,
-## so it's robust to the runtime model swap in CharacterVisual (no _ready ordering dependency).
+## so it works against whatever the entity's Visual node currently holds (an instanced model scene).
 ##
 ## Wiring uses a NodePath export resolved in _ready (typed-node @exports do NOT resolve from a hand-
 ## authored .tscn — they come back null). Point target_root_path at the node whose subtree holds the
