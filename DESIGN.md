@@ -22,8 +22,8 @@ balance-tight, optimal-build competitive game.
 > **⚠ Online status (vision vs reality):** the identity is *online* co-op, but on **this** codebase
 > only **same-machine two-window** is verified. Per-peer authority **does** propagate correctly — the
 > untested piece is **cross-machine transport** (NAT / relay / latency), not authority. Don't claim
-> "online verified" until that test is done. Full detail + the plan: the *Re-verify real online MP*
-> milestone in the roadmap below (canonical home for this story).
+> "online verified" until that test is done. Full detail + the plan: the **slice playtest** (roadmap
+> item 7 below — the real-online re-verify now lives there; canonical home for this story).
 
 - **Core loop:** 2–4 players fight escalating hordes together in first-person.
   **Friendly fire is ON and is a design pillar** — it's the comedy engine, not a footnote.

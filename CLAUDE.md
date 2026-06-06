@@ -199,7 +199,8 @@ see `DESIGN.md` for the blend rationale and the legibility north star):
 Implemented as `@export`-driven Resources under `systems/spells/` (`Spell` / `SpellForm` /
 `SpellElement` / `BlendSpell`), cast by a `WandComponent` on the player holding the
 `(Form, Element)` pair and enforcing `cast_delay_sec`. `Spell` exposes a `cast_on_host()` seam so
-an authored `CascadeSpell` (the roadmap A/B) slots in without reworking the wand.
+an authored `CascadeSpell` (a deferred cascade experiment — cut from the slice, see `DESIGN.md`)
+could slot in without reworking the wand.
 
 **Host-authoritative** (see Multiplayer Model): casts originate on the authority peer; the host
 spawns + resolves them (damage incl. friendly fire, reactions) and replicates out. **Reactions**
@@ -328,7 +329,7 @@ The reusable spine that is real and working today:
 > **Online status:** only **same-machine two-window** is verified on this codebase. Per-peer
 > authority *does* propagate correctly (repro in Known Issues); the open gap is **cross-machine
 > transport** (NAT / relay / latency), not an authority fix. Full story + the re-test plan: the
-> *Re-verify real online MP* milestone in `DESIGN.md` (canonical).
+> **slice playtest** (`DESIGN.md` roadmap item 7 — the real-online re-verify now lives there, canonical).
 
 ---
 
@@ -516,7 +517,7 @@ two hand-rolled `grab_focus` workarounds failed before a doc check found the one
   enable the DEBUG autoload + run two-window — the `[AUTH]` line in `player.gd` prints each copy's
   authority from every peer's view (a client sees the host's player as `authority=1 is_mine=false`,
   its own as `is_mine=true`). *Why it works* and the still-untested cross-machine transport piece:
-  the *Re-verify real online MP* milestone in `DESIGN.md` (canonical — don't restate it here).
+  the slice playtest (`DESIGN.md` roadmap item 7, canonical — don't restate it here).
 - `main_menu.gd` defaults to `127.0.0.1` and port `3000` (keep the port an `int` — ENet requires it).
 - `multiplayer.connected_to_server` is only wired for the client path; the host transitions
   immediately — correct, don't add host-side handling.
