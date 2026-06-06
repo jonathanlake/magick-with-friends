@@ -14,9 +14,15 @@ extends CharacterBody3D
 @export var attack_cooldown_sec: float = 1.0
 
 @onready var _health: HealthComponent = $HealthComponent
+@onready var _visual: Node3D = $Visual
 
 var _attack_timer: float = 0.0
 var _arena: Node
+# Replicated animation drivers, authored by the host (see enemy_base.tscn replication config) so
+# clients animate + face from steady values instead of differentiating a stepped network position
+# (the remote-jitter fix from the player pass). anim_speed -> locomotion blend; face_yaw -> heading.
+var anim_speed: float = 0.0
+var face_yaw: float = 0.0
 
 
 func _enter_tree() -> void:
@@ -54,11 +60,19 @@ func _physics_process(delta: float) -> void:
 		var dist := to_target.length()
 		if dist > 0.001:
 			var dir := to_target / dist
-			velocity.x = dir.x * move_speed
-			velocity.z = dir.z * move_speed
+			# Face the player (model-forward convention matches the player's: forward = -Z at yaw 0).
+			face_yaw = atan2(-dir.x, -dir.z)
+			if dist > melee_range:
+				velocity.x = dir.x * move_speed
+				velocity.z = dir.z * move_speed
+			else:
+				# In range: stop and swing — a stand-and-attack reads better than running in place.
+				velocity.x = 0.0
+				velocity.z = 0.0
 		_attack_timer -= delta
 		if dist <= melee_range and _attack_timer <= 0.0:
 			_attack_timer = attack_cooldown_sec
+			play_attack_anim.rpc()  # cosmetic swing on every peer (host owns the enemy)
 			# Player damage is host-authoritative and routed through Main (RPC health sync).
 			if _arena.has_method("apply_player_damage"):
 				_arena.apply_player_damage(target.peer_id, melee_damage)
@@ -66,7 +80,19 @@ func _physics_process(delta: float) -> void:
 		velocity.x = 0.0
 		velocity.z = 0.0
 
+	# Author the locomotion speed from real horizontal velocity (replicated for clients).
+	anim_speed = Vector2(velocity.x, velocity.z).length()
 	move_and_slide()
+
+
+# Cosmetic, every peer: drive the visual from the (host-authored, replicated) anim drivers. Runs on
+# all peers (the host authors them in _physics_process; clients receive them via replication).
+func _process(_delta: float) -> void:
+	if _visual == null:
+		return
+	_visual.rotation.y = face_yaw
+	if _visual.has_method("feed_speed"):
+		_visual.feed_speed(anim_speed)
 
 
 # Pick the closest still-alive player. Uses the "players" group (maintained by the engine)
@@ -90,3 +116,12 @@ func _on_died() -> void:
 		return  # host owns death; queue_free replicates the removal to clients
 	GameEvents.emit_enemy_died()
 	queue_free()
+
+
+# ── RPC: host → all peers, cosmetic attack swing ──
+# Authority RPC (not the client-owned-player `any_peer` exception): the host IS the enemy's authority,
+# so it can fan this out directly. call_local so the host's own copy swings too.
+@rpc("authority", "call_local", "reliable")
+func play_attack_anim() -> void:
+	if _visual != null and _visual.has_method("fire_oneshot"):
+		_visual.fire_oneshot()
