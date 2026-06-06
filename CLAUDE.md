@@ -46,9 +46,10 @@ Near-term the spell game is the focus; long-term this split is what enables the 
 - **Do not modify UIDs** in `.tscn` or `.gd.uid` files manually (the editor generates them).
 - **@export everything tunable.** Any value a non-coder might want to change must be `@export`.
 - **Enemies are `CharacterBody3D`** (kinematic, `move_and_slide`-driven). **Physics-chaos —
-  ragdolls, knockback, slips — is the embraced tone**, so `RigidBody3D` is fine for players and
-  props. (The player's controller — `RigidBody3D` today — is a *current default, open to change*,
-  not a fixed rule; see `DESIGN.md`.)
+  ragdolls, knockback, slips — is the embraced tone**, so `RigidBody3D` is fine for props. (The
+  player's controller is **`RigidBody3D` today**, but the switch to `CharacterBody3D` is now
+  **decided** — deferred to its own PR; see `DESIGN.md`. Physics-chaos becomes deliberate scripted
+  knockback/ragdoll after the switch.)
 - **Component pattern.** Behavior goes in component nodes, not monolithic scripts.
 - **Event bus pattern.** Cross-system communication goes through `GameEvents` signals.
   No direct node references across unrelated systems.
@@ -113,7 +114,9 @@ multiplayer finds and routes to the right node.
 
 Godot 4 `MultiplayerSynchronizer` replication modes used here:
 
-- **Mode 1** (`REPLICATION_MODE_ALWAYS`) — syncs every physics frame. Used for `global_position`.
+- **Mode 1** (`REPLICATION_MODE_ALWAYS`) — syncs every physics frame. Used for `global_position`
+  and the **animation drivers**: player `aim_yaw` + `anim_speed`, enemy `face_yaw` + `anim_speed`
+  (the owning peer authors them; every peer animates/faces from the replicated value — see Animation).
 - **Mode 2** (`REPLICATION_MODE_ON_CHANGE`) — syncs only when value changes. Used for the
   synced input fields in `PlayerInputSynchronizerComponent`.
 
@@ -162,6 +165,29 @@ from the camera (a forward raycast / muzzle spawn point) — no ground-cursor in
 climbing/parkour camera path has been **removed**. Cast *feel* on clients is immediate local
 cosmetic feedback (muzzle flash), decoupled from host-authoritative resolution.
 
+### Animation (LocomotionAnimator + AnimationTree)
+
+Players and enemies use KayKit models (gitignored `/assets/`) animated through one reusable
+`components/locomotion_animator.gd` on each **visual scene root** (`player_visual.tscn` /
+`enemy_visual.tscn`):
+
+- **Tree shape.** The animator reads an `AnimationTree`. Player: a bare **BlendSpace1D** (Idle↔Run by
+  speed). Enemy: a **BlendTree** = the same BlendSpace1D "Loco" feeding an **AnimationNodeOneShot**
+  whose shot is the attack clip — `blend_param` / `oneshot_request_param` exports point at the right
+  nested params (`parameters/Loco/blend_position`, `parameters/OneShot/request`).
+- **Replicate the DRIVER, never the animation.** The idiomatic Godot multiplayer rule (and the cause
+  of a real jitter bug we fixed): **don't differentiate a replicated `global_position`** to get speed
+  — a remote body's position arrives in held network snapshots, so differentiating it sawtooths the
+  blend (run↔idle, worst at a weapon tip on a long lever). Instead the **owning peer authors its real
+  speed** and the animator blends from that. The owner writes `anim_speed` (planar velocity) — and a
+  facing yaw (`aim_yaw` player / `face_yaw` enemy) — these **replicate (mode 1)**, and every peer
+  `feed_speed()`s the animator + rotates the visual from the steady value. Sample on the **physics
+  clock** (not `_process`), the same clock the body moves on.
+- **One-shots** (enemy attack) fan out cosmetically: the host calls `play_attack_anim.rpc()`
+  (`authority, call_local` — the host owns the enemy) → every peer `fire_oneshot()`s.
+- **Looping** on Idle/Run is set in the glb **import dock** (author action, not code); the attack clip
+  stays **non-looping** so the OneShot ends and returns to locomotion.
+
 ### Spell System — BLEND (the combat core)
 
 A spell fuses two swappable slots **on cast** → **one fused effect** (NOT a sequence/program;
@@ -194,8 +220,11 @@ autoloads/
   game_events.gd              — Global signal bus. Add signals here, not in random scripts.
                                 Has `enemy_died`, `enemy_count_changed(count)` + `alive_enemy_count`
                                 (register_enemy/unregister_enemy), and `local_player_damaged` (FP
-                                hit cue). Fuller vocabulary is a DESIGN.md roadmap item.
+                                hit cue, via `emit_local_player_damaged()`). Fuller vocabulary is a
+                                DESIGN.md roadmap item.
   game_manager.gd             — Autoload Node. Owns GameConfig + local player_name.
+  spell_catalog.gd            — Autoload. Index-stable Form/Element arrays + `make_blend(f,e)` so
+                                every peer builds the SAME spell from replicated indices. BUILT.
   network_manager.gd          — Transport abstraction. ONLY file that touches ENet/Steam/relay.
 
 components/
@@ -212,26 +241,40 @@ components/
                               — Extends MultiplayerSynchronizer. Gathers input on the authority
                                 peer, replicates it (mode 2). Syncs `movement_vector` (WASD) +
                                 `is_jump_pressed`. Cast is RPC-driven; interact is roadmap.
+  locomotion_animator.gd      — Reusable script on a visual scene root. Drives a locomotion
+                                BlendSpace1D (idle↔run) from a fed speed, and fires a OneShot
+                                (`fire_oneshot`) for a layered action. See Animation below. BUILT.
 
 entities/
   player/
-    player.gd                 — First-person RigidBody3D controller: run / jump / look /
-                                cast / death-state. Climbing/parkour removed.
+    player.gd                 — First-person RigidBody3D controller: run / jump / look / cast /
+                                death-state. Authors replicated `aim_yaw` + `anim_speed` and feeds
+                                the Visual's animator each frame. Climbing/parkour removed.
     player.tscn               — FP body, InputSync, MultiplayerSynchronizer, HealthComponent,
-                                HitFlashComponent, mesh (+ local material) + capsule collider,
-                                NameLabel, GroundCheck, camera. (WandComponent is added in code.)
+                                HitFlashComponent, a `Visual` instance of player_visual.tscn,
+                                capsule collider, NameLabel, GroundCheck, camera. (WandComponent
+                                is added in code.)
+    player_visual.tscn        — The visible rig: KayKit Mage (.glb) + an AnimationTree (idle↔run
+                                BlendSpace1D) + LocomotionAnimator. Editable art/anim scene. BUILT.
   projectiles/                — projectile.gd/.tscn: host-spawned + host-resolved spell
                                 projectile (Area3D). BUILT.
   enemies/                    — enemy_base.gd/.tscn: EnemyBase (CharacterBody3D + HealthComponent +
-                                HitFlashComponent; host AI: gravity / steer / cooldown'd melee). BUILT.
+                                HitFlashComponent; host AI: gravity / steer / cooldown'd melee;
+                                authors replicated `anim_speed` + `face_yaw`; attack-swing RPC).
+                                enemy_visual.tscn: KayKit Skeleton (.glb) + AnimationTree
+                                (BlendTree: idle↔run + a OneShot attack) + LocomotionAnimator. BUILT.
   pickups/                    — (roadmap) Form/Element spell pickups (interact-to-swap).
 
 systems/
   spells/                     — Spell/SpellForm/SpellElement/BlendSpell resources +
                                 WandComponent. BUILT.
-  reactions/                  — (roadmap) reaction table + Area3D reactive volumes.
+  reactions/                  — reactions.gd: host-central resolver (Node under Main). Direct
+                                damage + entity reactions (lightning chain incl. allies, fire
+                                burn/DoT); cosmetic broadcasts. BUILT (entity reactions; Area3D
+                                world volumes still roadmap).
   director/                   — wave_director.gd: host-side escalating ring spawner (timer + waves,
-                                alive cap). BUILT.
+                                alive cap). Boots PAUSED (`auto_start = false`) — the host begins
+                                the round via the console `start` (set_spawning). BUILT.
 
 resources/
   game_config.gd              — Resource. max_players, respawn_time. Not an autoload.
@@ -241,6 +284,9 @@ ui/
   hud/                        — DEV debug HUD (CanvasLayer): spell + HP + enemy/player counts + FPS
                                 readout, crosshair, death fade, host-left + self-damage overlays.
                                 (Proximity swap prompt is roadmap.)
+  console/                    — dev_console.gd: host-only dev console (backtick). Commands:
+                                help / start (begin the round) / players / wave /
+                                enemies [off|on|clear] / clear. Mounted host-only in main.gd. BUILT.
 
 debug/
   debug.gd                    — Dev-only helper. DEBUG autoload, DISABLED by default. Two-window
@@ -276,7 +322,8 @@ The reusable spine that is real and working today:
       (`global_position`, mode 1, spawn=true)
 - [x] `HealthComponent` / `GameConfig` / `GameManager` / `GameEvents` autoloads + components
 - [x] **IP input field** + name validation in the main menu (falls back to `127.0.0.1:3000`)
-- [x] Floating name labels over players; placeholder capsule meshes
+- [x] Floating name labels over players; KayKit Mage/Skeleton models with idle/run + attack animation
+      (placeholder capsules retired)
 - [x] **DEBUG autoload** — disabled-by-default two-window autostart (see below)
 - [x] Two-player local multiplayer verified — host + client see each other move (first-person)
 - [x] **Blend casting + friendly fire + death/respawn** — built and validated two-window
@@ -400,6 +447,12 @@ Use `preload("uid://...")` for scenes/scripts referenced in code. Never use stri
 `"res://entities/player/player.tscn"` — UIDs survive file moves. (New hand-authored scenes may
 reference by path until the editor assigns a uid on save.)
 
+### Assets (KayKit models)
+Character models (KayKit Mage / Skeleton, `.glb`) live in **gitignored `/assets/`** (local + cloud
+backup — private solo repo). The committed visual scenes (`player_visual.tscn` / `enemy_visual.tscn`)
+**instance** the `.glb`, so a fresh clone needs `assets/` copied in before those scenes load. The
+headless gate assumes the assets are present locally.
+
 ### Physics (Jolt)
 - **Enemies** are `CharacterBody3D` — `move_and_slide()` after setting `velocity`; gravity via
   `get_gravity()`; `is_on_floor()` for grounded. Knockback = add to `velocity`.
@@ -424,8 +477,10 @@ two hand-rolled `grab_focus` workarounds failed before a doc check found the one
 
 ## Known Issues / Watch Out For
 
-- **Player controller is `RigidBody3D` (first-person).** Don't assume RigidBody3D vs
-  CharacterBody3D when writing player-agnostic code — the choice is an open decision (`DESIGN.md`).
+- **Player controller is `RigidBody3D` (first-person) — for now.** The switch to `CharacterBody3D`
+  is **decided** (crisper feel, fixes the airborne wall-stick) but **not yet implemented** — it's its
+  own deferred PR (`DESIGN.md`). The `_integrate_forces`/force-and-friction movement specifics in the
+  Physics convention below get rewritten then; don't assume RigidBody3D in new player-agnostic code.
 - **Cast feel is host-asymmetric.** The host feels instant casts; clients eat a round-trip. The
   local cosmetic muzzle flash masks it; read playtests knowing host feel ≠ client feel (rotate hosts).
 - **Damage-value timing is host-asymmetric (distinct from cast feel above — that's latency, this is
