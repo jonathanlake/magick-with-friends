@@ -1,5 +1,11 @@
 extends CanvasLayer
 
+# Minimum spacing between self-damage screen pulses. A DoT (fire burn) deals ~10 damage ticks/sec,
+# and each routes a local_player_damaged signal here; without this throttle every tick restarts the
+# flash tween and the screen strobes. With it, a fresh hit still pulses immediately but a sustained
+# burn pulses calmly at most once per window instead of flickering.
+@export var damage_flash_min_interval_sec: float = 0.4
+
 @onready var _debug_label: Label = $DebugPanel/MarginContainer/VBoxContainer/DebugLabel
 @onready var _death_overlay: ColorRect = $DeathOverlay
 @onready var _death_label: Label = $DeathLabel
@@ -15,6 +21,7 @@ var _was_dead: bool = false
 var _readout_accum: float = 1.0  # > interval, so the first frame draws the readout immediately
 var _enemy_count: int = 0
 var _damage_tween: Tween
+var _last_damage_flash_ms: int = -1000000  # far in the past so the first flash always plays
 
 const _READOUT_INTERVAL_SEC := 0.25
 
@@ -101,6 +108,13 @@ func _on_local_player_damaged() -> void:
 # First-person self-damage cue (local only): a quick red screen pulse. Separate from the body-color
 # HitFlashComponent (teammates see that, but you can't — your own body is hidden in first-person).
 func show_damage_flash() -> void:
+	# Throttle: a DoT burn ticks ~10x/sec, and each tick lands here — without this the flash restarts
+	# every tick and strobes. One calm pulse per window instead (a fresh hit after the window still
+	# fires immediately).
+	var now := Time.get_ticks_msec()
+	if now - _last_damage_flash_ms < int(damage_flash_min_interval_sec * 1000.0):
+		return
+	_last_damage_flash_ms = now
 	if _damage_tween and _damage_tween.is_valid():
 		_damage_tween.kill()
 	_damage_overlay.modulate.a = 0.0
