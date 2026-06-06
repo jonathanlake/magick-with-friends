@@ -6,16 +6,19 @@ extends Node3D
 ## node's own world-space motion, so it Just Works on the player and (next pass) the enemy.
 ##
 ## Multiplayer: the idiomatic Godot approach is NOT to replicate animation state — replicate the
-## minimal driver and derive the animation locally on every peer. We already sync global_position
-## (mode 1), and this node moves with the body, so every peer measures the same speed from its own
-## position delta and feeds the same BlendSpace1D. No new replicated fields, no RPCs — purely local
-## presentation, identical on all machines.
+## minimal DRIVER (speed) and derive the animation locally on every peer.
 ##
-## Sampling runs in _physics_process, NOT _process: the body moves on the physics clock (the local
-## player in _integrate_forces, remote players via their MultiplayerSynchronizer on the physics
-## step), so reading position there gives a clean, fixed-step speed. Sampling in _process (render
-## rate) instead reads stair-stepped positions — some frames zero motion, the next a doubled jump —
-## which makes the derived speed flicker, jittering the blend (most visible at the staff tip).
+## Preferred driver is an externally-FED speed (see feed_speed): the entity's owning peer authors
+## its real velocity and replicates that one value, so every peer — including remote copies — blends
+## from a steady, network-snapshot-friendly number. The fallback (nothing fed) differentiates this
+## node's own world position. That's fine for a locally-simulated body, but JITTERS for a remote
+## copy: its position arrives in held network snapshots (no interpolation), so differentiating it
+## reads "full speed" on a packet frame and "zero" between packets — sawtoothing the blend
+## (most visible at a staff/weapon tip on a long lever from the hand bone). Feeding a synced speed
+## avoids that: a held speed value just means "keep running," not "stop and start."
+##
+## Sampling runs in _physics_process, NOT _process: the body moves on the physics clock, so reading
+## there gives a clean, fixed-step signal (sampling in _process reads stair-stepped positions).
 ##
 ## Wiring uses NodePath exports resolved in _ready (typed-node @exports do NOT resolve from a hand-
 ## authored .tscn — they come back null; see CLAUDE.md). Looping on the Idle/Run clips is set in the
@@ -36,6 +39,8 @@ var _tree: AnimationTree
 var _last_pos: Vector3
 var _blend: float = 0.0
 var _has_last_pos: bool = false
+var _external_speed: float = 0.0
+var _use_external: bool = false
 
 
 func _ready() -> void:
@@ -49,22 +54,36 @@ func _ready() -> void:
 	_has_last_pos = true
 
 
+## Feed the locomotion speed (world units/sec) from an external, network-smooth source — the
+## entity's owning peer authors it from real velocity and replicates it, so every peer (including
+## remote copies) blends from a steady value instead of differentiating a stepped network position.
+## Once fed, the position-differentiation fallback is disabled for this instance.
+func feed_speed(speed: float) -> void:
+	_external_speed = speed
+	_use_external = true
+
+
 func _physics_process(delta: float) -> void:
 	if _tree == null or delta <= 0.0:
 		return
 
-	# Horizontal speed from this node's own world motion — measured identically on every peer.
+	# Normalize to 0..1 and ease toward it so the blend doesn't snap.
+	var target := clampf(_sample_speed(delta) / maxf(run_speed, 0.001), 0.0, 1.0)
+	_blend = lerpf(_blend, target, clampf(blend_smoothing * delta, 0.0, 1.0))
+	_tree.set(blend_param, _blend)
+
+
+# Preferred: the externally-fed (replicated) speed. Fallback: differentiate our own world position
+# (fine for a locally-simulated body, jittery for a network-stepped remote copy — see class doc).
+func _sample_speed(delta: float) -> float:
+	if _use_external:
+		return _external_speed
 	var here := global_position
 	if not _has_last_pos:
 		_last_pos = here
 		_has_last_pos = true
-		return
+		return 0.0
 	var planar := here - _last_pos
 	planar.y = 0.0
 	_last_pos = here
-	var speed := planar.length() / delta
-
-	# Normalize to 0..1 and ease toward it so the blend doesn't jitter with frame-to-frame noise.
-	var target := clampf(speed / maxf(run_speed, 0.001), 0.0, 1.0)
-	_blend = lerpf(_blend, target, clampf(blend_smoothing * delta, 0.0, 1.0))
-	_tree.set(blend_param, _blend)
+	return planar.length() / delta
