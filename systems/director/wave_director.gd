@@ -19,11 +19,22 @@ extends Node
 
 var _wave_index: int = 0
 var _enemy_counter: int = 0
+# Host-side toggle (dev console). When false, the wave loop idles — no spawns, no wave advance.
+var _spawning_enabled: bool = true
 
 
 # Read-only accessor for the dev console / HUD.
 func current_wave() -> int:
 	return _wave_index
+
+
+# Dev-console control: pause/resume wave spawning (host-only; the console is host-only).
+func set_spawning(enabled: bool) -> void:
+	_spawning_enabled = enabled
+
+
+func is_spawning() -> bool:
+	return _spawning_enabled
 
 
 func _ready() -> void:
@@ -40,6 +51,12 @@ func _run_waves() -> void:
 	if not is_inside_tree():
 		return
 	while is_inside_tree():
+		if not _spawning_enabled:
+			# Paused via the dev console — idle-poll until re-enabled (no wave advance, no spawns).
+			await get_tree().create_timer(0.5).timeout
+			if not is_inside_tree():
+				return
+			continue
 		_wave_index += 1
 		var count := base_enemies_per_wave + enemies_added_per_wave * (_wave_index - 1)
 		print("[WaveDirector] Wave %d — spawning %d enemies" % [_wave_index, count])
