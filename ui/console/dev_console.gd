@@ -1,8 +1,9 @@
 extends CanvasLayer
 
 ## Host-only dev console (v1). Toggled with backtick. Commands to ease playtesting:
-## help / start / players / wave / enemies / clear. `start` begins the round (the wave director
-## boots paused). Mounted only on the host (see main.gd), so it is inherently
+## help / start / give / players / wave / enemies / clear. `start` begins the round (the wave director
+## boots paused); `give [all]` hands a random spell (acquisition stand-in). Mounted only on the host
+## (see main.gd), so it is inherently
 ## host-only. While open it sets GameManager.console_open (suspends the host's player input —
 ## look/move/cast) and frees the mouse; the world keeps running for everyone (no pause).
 
@@ -59,11 +60,13 @@ func _run(line: String) -> void:
 	var cmd := parts[0].to_lower()
 	match cmd:
 		"help":
-			_println("commands: help, start, players, wave, enemies [off|on|clear], clear")
+			_println("commands: help, start, give [all], players, wave, enemies [off|on|clear], clear")
 		"clear":
 			_output.clear()
 		"start":
 			_cmd_start()
+		"give":
+			_cmd_give(parts)
 		"players":
 			_cmd_players()
 		"wave":
@@ -97,6 +100,31 @@ func _cmd_start() -> void:
 		return
 	director.set_spawning(true)
 	_println("  round started — the horde is coming")
+
+
+# Hand a player a random (form, element) blend — the slice's stand-in for drop-based acquisition,
+# enough to playtest the random keep/swap loop without the full pickup system. `give` rerolls the
+# host's own spell; `give all` rerolls every player. Reuses SpellCatalog + WandComponent's
+# host-broadcast equip-sync (request_set_blend), so the change shows on every peer.
+func _cmd_give(parts: PackedStringArray) -> void:
+	var fc := SpellCatalog.form_count()
+	var ec := SpellCatalog.element_count()
+	if fc <= 0 or ec <= 0:
+		_println("  spell catalog is empty")
+		return
+	var all := parts.size() > 1 and parts[1].to_lower() == "all"
+	var n := 0
+	for child in get_parent().get_children():
+		var p := child as Player
+		if p == null:
+			continue
+		if not all and p.peer_id != multiplayer.get_unique_id():
+			continue
+		var wand := p.get_node_or_null("WandComponent")
+		if wand and wand.has_method("request_set_blend"):
+			wand.request_set_blend(randi() % fc, randi() % ec)
+			n += 1
+	_println("  gave a random spell to %d player(s)" % n)
 
 
 func _cmd_wave() -> void:
