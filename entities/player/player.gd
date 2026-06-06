@@ -25,12 +25,19 @@ var peer_id: int = 1
 # Catalog indices for the dealt blend, set by the spawner (replicated, so identical on every peer).
 var form_idx: int = 0
 var element_idx: int = 0
+# Replicated look-yaw (the player's aim direction). The owning peer writes it from the camera each
+# frame; the player MultiplayerSynchronizer replicates it outward (see player.tscn) so remote copies
+# can face the model where the player is actually looking. The body is angular-locked and never
+# rotates, so we rotate the Visual node by this instead.
+var aim_yaw: float = 0.0
 
 @onready var _input_sync: PlayerInputSynchronizerComponent = $PlayerInputSynchronizerComponent
 @onready var _camera_rig: Node3D = $CameraRig
 @onready var _camera: Camera3D = $CameraRig/Camera3D
 @onready var _name_label: Label3D = $NameLabel
-@onready var _mesh: MeshInstance3D = $MeshInstance3D
+# The visible body (placeholder capsule, or a swapped-in model — see CharacterVisual). Hidden for the
+# local first-person player; shown for remote copies so teammates see this player's body.
+@onready var _visual: Node3D = $Visual
 @onready var _ground_check: RayCast3D = $GroundCheck
 
 var _camera_yaw: float = 0.0
@@ -70,7 +77,7 @@ func _ready() -> void:
 
 	_camera.current = true
 	_name_label.visible = false
-	_mesh.visible = false
+	_visual.visible = false
 	_camera_rig.global_position = global_position + Vector3(0.0, camera_height, 0.0)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
@@ -99,12 +106,20 @@ func _input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	if not is_multiplayer_authority():
+		# Remote copy: orient the visible model to the replicated look-yaw (body is angular-locked).
+		if _visual:
+			_visual.rotation.y = aim_yaw
 		return
 
 	var target := global_position + Vector3(0.0, camera_height, 0.0)
 	_camera_rig.global_position = _camera_rig.global_position.lerp(target, camera_smoothing * delta)
 	_camera_rig.global_rotation.y = _camera_yaw
 	_camera.rotation.x = _camera_pitch
+
+	# Publish our look-yaw for remotes, and face our own (FP-hidden) model the same way.
+	aim_yaw = _camera_yaw
+	if _visual:
+		_visual.rotation.y = aim_yaw
 
 	if _dead:
 		return
@@ -161,11 +176,11 @@ func set_dead(dead: bool) -> void:
 	_dead = dead
 	freeze = dead
 	if dead:
-		_mesh.visible = false
+		_visual.visible = false
 		_name_label.visible = false
 	else:
-		# Remote players show their mesh + name; the local first-person player keeps both hidden.
-		_mesh.visible = not is_multiplayer_authority()
+		# Remote players show their body + name; the local first-person player keeps both hidden.
+		_visual.visible = not is_multiplayer_authority()
 		_name_label.visible = not is_multiplayer_authority()
 
 

@@ -1,8 +1,9 @@
-[gd_scene load_steps=8 format=3]
+[gd_scene load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://entities/enemies/enemy_base.gd" id="1_enemy"]
 [ext_resource type="PackedScene" uid="uid://bsde65brylo0j" path="res://components/health_component.tscn" id="2_health"]
 [ext_resource type="PackedScene" path="res://components/hit_flash_component.tscn" id="3_hitflash"]
+[ext_resource type="Script" path="res://components/character_visual.gd" id="4_visual"]
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_enemy"]
 radius = 0.4
@@ -28,7 +29,11 @@ collision_layer = 4
 collision_mask = 7
 script = ExtResource("1_enemy")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
+[node name="Visual" type="Node3D" parent="."]
+script = ExtResource("4_visual")
+model_path = "res://assets/models/skeleton_minion/skeleton_minion.glb"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Visual"]
 mesh = SubResource("CapsuleMesh_enemy")
 material_override = SubResource("StandardMaterial3D_enemy")
 
@@ -42,7 +47,7 @@ max_health = 40
 replication_config = SubResource("SceneReplicationConfig_enemy")
 
 [node name="HitFlashComponent" parent="." instance=ExtResource("3_hitflash")]
-target_mesh_path = NodePath("../MeshInstance3D")
+target_root_path = NodePath("../Visual")
 health_component_path = NodePath("../HealthComponent")
 flash_color = Color(1, 0.5, 0, 1)
 flash_duration_sec = 0.3

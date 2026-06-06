@@ -4,11 +4,15 @@
 [ext_resource type="PackedScene" uid="uid://cvfl2msql7gnl" path="res://components/player_input_synchronizer_component.tscn" id="2_sglur"]
 [ext_resource type="PackedScene" uid="uid://bsde65brylo0j" path="res://components/health_component.tscn" id="3_bls4j"]
 [ext_resource type="PackedScene" path="res://components/hit_flash_component.tscn" id="4_hitflash"]
+[ext_resource type="Script" path="res://components/character_visual.gd" id="5_visual"]
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_symyc"]
 properties/0/path = NodePath(".:global_position")
 properties/0/spawn = true
 properties/0/replication_mode = 1
+properties/1/path = NodePath(".:aim_yaw")
+properties/1/spawn = true
+properties/1/replication_mode = 1
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_symyc"]
 
@@ -36,12 +40,16 @@ replication_config = SubResource("SceneReplicationConfig_symyc")
 [node name="HealthComponent" parent="." unique_id=1065936981 instance=ExtResource("3_bls4j")]
 
 [node name="HitFlashComponent" parent="." instance=ExtResource("4_hitflash")]
-target_mesh_path = NodePath("../MeshInstance3D")
+target_root_path = NodePath("../Visual")
 health_component_path = NodePath("../HealthComponent")
 flash_color = Color(1, 0.3, 0.3, 1)
 flash_duration_sec = 0.3
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=473923958]
+[node name="Visual" type="Node3D" parent="."]
+script = ExtResource("5_visual")
+model_path = "res://assets/models/mage/mage.glb"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Visual" unique_id=473923958]
 mesh = SubResource("CapsuleMesh_symyc")
 material_override = SubResource("StandardMaterial3D_player")
 
@@ -49,8 +57,10 @@ material_override = SubResource("StandardMaterial3D_player")
 shape = SubResource("CapsuleShape3D_player")
 
 [node name="NameLabel" type="Label3D" parent="." unique_id=2121726113]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.2, 0)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.1, 0)
 billboard = 1
+no_depth_test = true
+render_priority = 1
 outline_size = 6
 
 [node name="GroundCheck" type="RayCast3D" parent="." unique_id=312047891]
