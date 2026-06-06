@@ -7,6 +7,29 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ---
 
+## 2026-06-06 (scope pass)
+
+*Trimmed the slice toward the playtest, after two external reviews*
+
+### ⚙️ Scope & Sequencing
+
+- **Console `give [all]`** — a host dev command that rolls a random spell onto a player (reuses the
+  spell catalog + the wand's equip-sync). The slice's stand-in for drop-based acquisition, enough to
+  playtest the random keep/swap loop without building the full pickup system.
+- **Cut the cascade A/B from the slice** — blend is the decided engine so it can't move it, and the
+  comparison is a noisy signal; parked until a content question makes it pressing.
+- **Pulled the real-online / latency test up next to the playtest** — it was gated under "beyond the
+  slice (only if it proves fun)," but latency killing cast feel is *why* it might not be fun, so that
+  gating was circular. Named client cast-latency the #1 slice risk; the first real test must be a
+  real connection on two machines, not zero-latency two-window.
+- **Legibility bar clarified** — it measures in-world legibility, so the playtest runs with no
+  "killed by X" HUD (printing the answer contaminates the test); caster attribution is a deferred
+  option, not a slice feature.
+- **Trimmed the "reusable spine / sandbox" framing to one line** so it stops acting as a default
+  tiebreaker for architecture work before a second game justifies it.
+
+---
+
 ## 2026-06-06 (continued)
 
 *Player controller migration + review fixes + docs (#40–#42)*

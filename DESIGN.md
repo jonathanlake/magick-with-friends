@@ -15,13 +15,9 @@ the decisions here are settled unless told otherwise.
 friendly-fire laughs, happy accidents, jank-as-charm. It is explicitly **NOT** a
 balance-tight, optimal-build competitive game.
 
-> **Project frame (the bigger picture).** At its core this is a **reusable co-op multiplayer
-> spine** — host/join, the swappable transport seam, the host-authoritative model, spawners +
-> event bus — and *games are built on top of it*. The **spell game described here is the first and
-> current focus**: the near-term job is to prove it's fun with friends before broadening. The
-> longer-term direction — keep the spine constant and let the *level* be the game (the swappable
-> mini-game sandbox in Future Considerations) — is real but **not active**: no second game starts
-> until the slice proves out. Everything below describes the spell game unless it says otherwise.
+> **Project frame.** Build **this game** and prove it's fun with friends. (A reusable
+> multiplayer-spine / swappable-mini-game-sandbox future is possible — parked in Future
+> Considerations — but it earns no architectural weight until a second game needs it.)
 
 > **⚠ Online status (vision vs reality):** the identity is *online* co-op, but on **this** codebase
 > only **same-machine two-window** is verified. Per-peer authority **does** propagate correctly — the
@@ -48,9 +44,16 @@ balance-tight, optimal-build competitive game.
   are a **priority, not polish-later.**
   - **Acceptance bar (how we know it passes):** after any death, the victim can **name what
     killed them** — which element/form, and for friendly fire *whose* — within a couple
-    seconds, **unprompted**. We ask this explicitly in the playtest. Per effect the bar is:
-    a distinct color + a pre-impact telegraph + a readable reaction. (A playtest question,
-    not telemetry — staying cheap.)
+    seconds, **unprompted**. Per effect the bar is: a distinct color + a pre-impact telegraph +
+    a readable reaction. (A playtest question, not telemetry — staying cheap.)
+  - **Measure it IN-WORLD, with no answer-printing HUD.** The bar tests whether the chaos was
+    legible from what the victim *saw* (color / telegraph / reaction), so the playtest must run with
+    **no kill-feed / "killed by X" banner** — a HUD line that prints the answer makes everyone
+    "pass" by reading it and contaminates the diagnostic. **Caster identity ("whose")** is the hard
+    part — per-element color tells you *lightning*, not *Dave* — and the slice ships per-element VFX
+    only, so expect the test to reveal whether "whose" needs **per-caster identity** (tint / trail /
+    directional hit cue). That attribution is a **deferred option**, built only if the test shows
+    it's needed — and if built, **suppressed/delayed** during any legibility test.
 
 **Influences:** the co-op horde lineage (**Left 4 Dead / Vermintide / Helldivers 2**) for
 the format and the friendly-fire chaos; **Noita** for the wand-building *feel* (the blend,
@@ -116,17 +119,26 @@ reuses the `MultiplayerSpawner` / RPC / `GameEvents` patterns.
    + **entity reactions** (`systems/reactions/reactions.gd`: lightning chain incl. allies, fire
    burn/DoT) landed (#33), index-stable via the `SpellCatalog` autoload. **Still pending:** the
    1–2 `Area3D` world reactive volumes (oil, water) and the distinct per-element VFX done-criterion.
-5. **Wild-cascade A/B (hardcoded) — a *flavor* probe, NOT an engine bake-off.** Blend is the
-   **decided engine** (Form × Element, one fused cast) and this A/B cannot move that. Its only
-   question: do players want chaos sourced more from the **world** (reactions/physics — blend's
-   default) or from the **spell** (internal cascades)? — which informs *modifier/content*
-   direction later, not the engine. 2–3 authored `CascadeSpell`s (split → chain → explode) via
-   the `Spell.cast_on_host()` seam + a `GameConfig.spell_mode = BLEND | CASCADE` toggle, no generative
-   engine. (The 3 hand-authored cascades aren't a fair proxy for cascade-*as-a-system* — fine,
-   because we're sensing flavor preference, not picking an engine.)
-6. **Random keep-or-swap acquisition.** Enemy-dropped Form/Element pickups; `interact`
-   action; interact-to-swap that drops the old spell as a re-grabbable pickup.
-7. **Legibility tightening pass**, then the 30-minute friend playtest (run as the A/B).
+5. **Wild-cascade A/B — CUT from the slice (deferred).** Blend is the **decided engine**, so this
+   *flavor* probe (world-sourced vs. spell-sourced chaos) can't move it, and 3 hand-authored cascades
+   vs. emergent reactions is a noisy signal for a non-pressing question. Parked — revisit only if a
+   modifier/content question makes the preference pressing. (Mechanism if ever needed: authored
+   `CascadeSpell`s via the `Spell.cast_on_host()` seam + a `spell_mode` toggle.)
+6. **Random keep-or-swap acquisition — slice stand-in.** A host-only dev-console **`give [all]`**
+   rolls a random `(Form, Element)` onto a player (reuses `SpellCatalog` + `WandComponent`'s
+   host-broadcast equip-sync) — enough to playtest the random-loadout / keep-or-swap *loop*. The full
+   enemy-dropped pickups + `interact`-to-swap (drop old as a re-grabbable pickup) is **deferred to
+   post-slice**.
+7. **The fun test — now includes the real-online check.** A light legibility tightening pass, then
+   the actual answer to "is it fun?": a **real-connection, 2-machine, 30-minute** session — **NOT**
+   two-window/LAN (zero latency hides the #1 risk). This *is* the real-online-MP re-verify, **pulled
+   up from "beyond the slice"** — latency killing cast feel is a reason it won't be fun, so it can't
+   be gated behind the slice succeeding (that's circular). Per-peer authority already propagates
+   correctly (the `spawn_function` runs on all peers; the two-window `[AUTH]` line confirms); the
+   untested piece is **cross-machine transport** (NAT / port-forwarding / relay) + **latency feel**.
+   Watch for: **cast feel under real latency** (the #1 risk — host-authoritative casting, no
+   prediction, masked only by a local muzzle flash), **friendly-fire legibility *from the world***
+   (see the acceptance bar), and the **keep/swap loop**.
 
 **Presentation (cross-cutting, in progress).** Placeholder capsules retired for **KayKit** models
 (Mage / Skeleton). Players animate idle↔run; skeletons idle↔run + an attack swing, facing their
@@ -140,13 +152,6 @@ Beyond the slice (only if it proves fun):
 - **Run / meta structure** beyond wave-survival.
 - **Production HUD** (health/shield, current spell, wave/timer).
 - **Spawn point system** (4–8 points, by player index).
-- **Re-verify real online MP (named milestone).** Per-peer authority already propagates correctly
-  — the custom `spawn_function` runs on **all peers** (Godot docs), so each client re-runs it and
-  sets `set_multiplayer_authority(data.peer_id)` on its copies. Verifiable now via the two-window
-  `[AUTH]` diagnostic in `player.gd`. What's still untested is **cross-machine transport** (NAT /
-  port-forwarding / relay) + latency feel — real online worked on the predecessor (external relay);
-  confirm it here on two actual machines before claiming "online." (Not an authority bug — earlier
-  notes that framed it as one were a misdiagnosis.)
 - **Velocity sync** for smoother client interpolation.
 - **More Forms/Elements**, modifiers (constrained), downed/revive.
 
