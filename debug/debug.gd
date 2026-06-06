@@ -64,9 +64,11 @@ func _leftmost_screen() -> int:
 	return best
 
 
-# Host headless, load Main, wait a few frames, and assert the host player spawned.
-# Frame-based (not wall-clock) so it's deterministic under headless. Quits with code
-# 0 on success, 1 on failure; the `SMOKE_OK` / `SMOKE_FAIL` print is the harness's signal.
+# Host headless, load Main, wait a few frames, and assert BOTH the host player AND the enemy
+# subsystem are live + wired. Frame-based (not wall-clock) so it's deterministic under headless.
+# Quits with code 0 on success, 1 on failure; the `SMOKE_OK` / `SMOKE_FAIL` print is the harness's
+# signal. The enemy check is deliberate: the wave director boots paused (auto_start=false), so
+# without spawning one here the gate would never exercise enemy spawn / AI / animation at all.
 func _run_smoke() -> void:
 	await get_tree().process_frame
 	GameManager.player_name = "SMOKE_HOST"
@@ -77,15 +79,41 @@ func _run_smoke() -> void:
 	var main := get_tree().current_scene
 	var pid := str(multiplayer.get_unique_id())
 	var player: Node = main.get_node_or_null(pid) if main else null
-	# Print evidence read LIVE from the running scene tree (not fixed strings), so a PASS is
-	# self-verifying: the loaded scene's name, the host player's real node path, and that its
-	# components are wired (WandComponent is added in code; HealthComponent comes from the scene).
-	if player != null:
-		print("SMOKE_OK: scene='%s' | host player '%s' is live | WandComponent=%s HealthComponent=%s | is_server=%s" % [
-			main.name, player.get_path(), player.has_node("WandComponent"),
-			player.has_node("HealthComponent"), multiplayer.is_server()])
-		get_tree().quit(0)
-	else:
+	if player == null:
 		print("SMOKE_FAIL: scene='%s', no host player node named '%s' in the tree" % [
 			(str(main.name) if main else "<none>"), pid])
 		get_tree().quit(1)
+		return
+
+	# Exercise the enemy path (spawn one directly — the director is paused at boot).
+	var enemy_report: String = await _smoke_check_enemy(main)
+	if enemy_report.begins_with("FAIL"):
+		print("SMOKE_FAIL: enemy subsystem — %s" % enemy_report)
+		get_tree().quit(1)
+		return
+
+	# Evidence read LIVE from the running tree (not fixed strings), so PASS is self-verifying.
+	print("SMOKE_OK: scene='%s' | host player '%s' is live | WandComponent=%s HealthComponent=%s | enemy: %s | is_server=%s" % [
+		main.name, player.get_path(), player.has_node("WandComponent"),
+		player.has_node("HealthComponent"), enemy_report, multiplayer.is_server()])
+	get_tree().quit(0)
+
+
+# Spawn one enemy via Main's host spawn path and confirm it's live with its AnimationTree active.
+# Returns a short evidence string, or "FAIL: <why>". Host-driven only (no input).
+func _smoke_check_enemy(main: Node) -> String:
+	if not main.has_method("spawn_enemy"):
+		return "FAIL: Main has no spawn_enemy()"
+	main.spawn_enemy({"name": "Enemy_smoke", "pos": Vector3(3.0, 1.0, 0.0)})
+	for _i in 8:
+		await get_tree().physics_frame
+	var enemies := main.get_node_or_null("Enemies")
+	var enemy: Node = enemies.get_child(0) if enemies and enemies.get_child_count() > 0 else null
+	if enemy == null:
+		return "FAIL: no enemy spawned under Main/Enemies"
+	var tree := enemy.get_node_or_null("Visual/AnimationTree") as AnimationTree
+	if tree == null:
+		return "FAIL: enemy Visual/AnimationTree missing"
+	if not tree.active:
+		return "FAIL: enemy AnimationTree not active (LocomotionAnimator didn't wire)"
+	return "'%s' spawned, AnimationTree active" % enemy.name
