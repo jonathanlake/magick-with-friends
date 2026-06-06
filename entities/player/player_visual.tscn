@@ -1,8 +1,32 @@
-[gd_scene format=3 uid="uid://cg1pvs3eyq42f"]
+[gd_scene load_steps=6 format=3 uid="uid://cg1pvs3eyq42f"]
 
 [ext_resource type="PackedScene" uid="uid://roymm0vtk6mf" path="res://assets/models/mage/mage.glb" id="1_mage"]
+[ext_resource type="Script" path="res://components/locomotion_animator.gd" id="2_anim"]
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_idle"]
+animation = &"Idle"
+
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_run"]
+animation = &"Running_A"
+
+[sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_loco"]
+blend_point_0/node = SubResource("AnimationNodeAnimation_idle")
+blend_point_0/pos = 0.0
+blend_point_1/node = SubResource("AnimationNodeAnimation_run")
+blend_point_1/pos = 1.0
+min_space = 0.0
+max_space = 1.0
+value_label = "speed"
 
 [node name="PlayerVisual" type="Node3D"]
+script = ExtResource("2_anim")
+animation_tree_path = NodePath("AnimationTree")
+run_speed = 12.0
 
 [node name="mage" parent="." instance=ExtResource("1_mage")]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, -0.9, 0)
+
+[node name="AnimationTree" type="AnimationTree" parent="."]
+tree_root = SubResource("AnimationNodeBlendSpace1D_loco")
+anim_player = NodePath("../mage/AnimationPlayer")
+active = false
