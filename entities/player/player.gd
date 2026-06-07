@@ -13,6 +13,10 @@ extends CharacterBody3D
 @export var camera_height: float = 0.75
 @export var camera_smoothing: float = 15.0
 @export var mouse_sensitivity: float = 0.003
+# Casts spawn at the staff muzzle but aim toward a point this far down the camera ray, so the shot
+# converges on the crosshair instead of flying parallel to it (offset by the muzzle's position).
+# Larger = flatter convergence; should comfortably exceed normal engagement range.
+@export var cast_aim_distance: float = 100.0
 
 # Set by the spawner before _enter_tree. Must be applied in _enter_tree (not _ready)
 # so MultiplayerSynchronizer children register with the correct authority on tree entry.
@@ -44,6 +48,11 @@ var anim_speed: float = 0.0
 # local first-person player; shown for remote copies so teammates see this player's body. Also
 # rotated by aim_yaw so the model faces the look direction.
 @onready var _visual: Node3D = $Visual
+# Spell origin marker on the staff (under the Camera3D so it tracks the full look direction). Casts
+# spawn the projectile + muzzle flash from here instead of the camera/face. Read on the OWNING peer
+# (where the camera is live), so a Camera3D-child marker is correct even though remotes don't run the
+# camera. Falls back to a camera-forward offset if the marker is missing.
+@onready var _muzzle: Marker3D = get_node_or_null("CameraRig/Camera3D/Muzzle")
 
 var _camera_yaw: float = 0.0
 var _camera_pitch: float = 0.0
@@ -140,10 +149,20 @@ func _process(delta: float) -> void:
 		_jump_queued = true
 	_prev_jump_pressed = jump_now
 
-	# Cast: read locally on the authority peer; the wand gates by its own cooldown.
+	# Cast: read locally on the authority peer; the wand gates by its own cooldown. Spawn from the
+	# staff muzzle (not the face), but AIM from the muzzle toward a far point on the camera ray so the
+	# shot converges on the crosshair — aiming straight camera-forward from an offset muzzle would put
+	# every shot ~0.4u down-right of the target. Fan the cast gesture to all peers only when a cast
+	# actually fired (try_cast returns true), so remotes see the swing on real casts.
 	if _wand and Input.is_action_pressed("cast") and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var aim := -_camera.global_transform.basis.z
-		_wand.try_cast(_camera.global_position + aim * 0.6, aim)
+		var origin := _camera.global_position + aim * 0.6
+		var direction := aim
+		if _muzzle:
+			origin = _muzzle.global_position
+			direction = (_camera.global_position + aim * cast_aim_distance - origin).normalized()
+		if _wand.try_cast(origin, direction):
+			play_cast_anim.rpc()
 
 
 # Owning-peer movement on the physics clock. CharacterBody3D velocity model: gravity + jump on Y,
@@ -219,6 +238,17 @@ func _cycle_debug_spell() -> void:
 	# Intended integer division: linear / ec is the form index, linear % ec the element index.
 	@warning_ignore("integer_division")
 	_wand.request_set_blend(linear / ec, linear % ec)
+
+
+# ── RPC: owner → all cast-animation broadcast ──
+# Fired by the owning peer when a cast actually happens. The player node's authority IS the owning
+# peer, so an "authority, call_local" RPC broadcasts to all peers (incl. the owner) — the same shape
+# the host uses for the enemy attack. The local FP player's Visual is hidden, so the owner doesn't see
+# its own gesture (expected in first-person); remotes do. Cosmetic only — never touches game state.
+@rpc("authority", "call_local", "reliable")
+func play_cast_anim() -> void:
+	if _visual and _visual.has_method("fire_oneshot"):
+		_visual.fire_oneshot()
 
 
 # Debug-only authority probe. Gated on the DEBUG autoload existing (it's disabled by default, no
