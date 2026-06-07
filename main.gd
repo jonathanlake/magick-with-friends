@@ -57,9 +57,12 @@ func _ready() -> void:
 		enemy.position = data["pos"]
 		return enemy
 
+	# Dev console on EVERY peer. It gates itself by role: the host gets the full command set; clients
+	# get only the local-safe ones (help/clear) plus a seam for future client-side commands. See
+	# dev_console.gd's _HOST_ONLY gate.
+	add_child(_console_scene.instantiate())
+
 	if multiplayer.is_server():
-		# Host-only dev console (read-only commands to ease playtesting).
-		add_child(_console_scene.instantiate())
 		# Spawn the host's own player immediately — no RPC needed.
 		multiplayer_spawner.spawn(_player_spawn_config(multiplayer.get_unique_id(), GameManager.player_name))
 		NetworkManager.peer_disconnected.connect(_on_peer_disconnected)

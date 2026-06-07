@@ -1,28 +1,35 @@
 extends CanvasLayer
 
-## Host-only dev console (v1). Toggled with backtick. Commands to ease playtesting:
-## help / start / give / players / wave / enemies / clear. `start` begins the round (the wave director
-## boots paused); `give [all]` hands a random spell (acquisition stand-in). Mounted only on the host
-## (see main.gd), so it is inherently
-## host-only. While open it sets GameManager.console_open (suspends the host's player input —
-## look/move/cast) and frees the mouse; the world keeps running for everyone (no pause).
+## Dev console (v1). Toggled with backtick. Mounted on EVERY peer (see main.gd), but gated by role:
+## the HOST gets the full command set (help / start / give / players / wave / enemies / clear); a
+## CLIENT gets only the local-safe commands (help / clear) plus a seam for future client-side
+## commands — host-only commands print "host only" rather than running. `start` begins the round (the
+## wave director boots paused); `give [all]` hands a random spell (acquisition stand-in). While open
+## it sets GameManager.console_open (suspends THIS peer's own player input — look/move/cast) and frees
+## the mouse; the world keeps running for everyone (no pause).
+
+# Commands that act on host-authoritative state (wave director, spawning, all players). On a client
+# they'd read stale/empty state or no-op, so they're rejected there. help/clear are local-safe.
+const _HOST_ONLY := ["start", "give", "players", "wave", "enemies"]
 
 @onready var _panel: Control = $Panel
 @onready var _output: RichTextLabel = $Panel/Margin/VBox/Output
 @onready var _line_edit: LineEdit = $Panel/Margin/VBox/Input
 
 var _open: bool = false
+var _is_host: bool = false
 
 
 func _ready() -> void:
+	_is_host = multiplayer.is_server()
 	_panel.visible = false
 	_line_edit.text_submitted.connect(_on_submit)
-	_println("Dev console ready — type 'help'.")
+	_println("Dev console ready (%s) — type 'help'." % ("host" if _is_host else "client"))
 
 
 func _exit_tree() -> void:
-	# If the console is freed while open (e.g. the host returns to menu mid-command), clear the
-	# global input-suspend flag so the next session doesn't start with movement/look frozen.
+	# If the console is freed while open (e.g. this peer returns to menu mid-command), clear the
+	# local input-suspend flag so the next session doesn't start with movement/look frozen.
 	if _open:
 		GameManager.console_open = false
 
@@ -58,9 +65,13 @@ func _on_submit(text: String) -> void:
 func _run(line: String) -> void:
 	var parts := line.split(" ", false)
 	var cmd := parts[0].to_lower()
+	# Clients can open the console but only run local-safe commands; host-only ones are rejected.
+	if cmd in _HOST_ONLY and not _is_host:
+		_println("  '%s' is host-only" % cmd)
+		return
 	match cmd:
 		"help":
-			_println("commands: help, start, give [all], players, wave, enemies [off|on|clear], clear")
+			_cmd_help()
 		"clear":
 			_output.clear()
 		"start":
@@ -75,6 +86,15 @@ func _run(line: String) -> void:
 			_cmd_enemies(parts)
 		_:
 			_println("unknown command: %s (try help)" % cmd)
+
+
+# Role-branched: the host sees the full command set; a client sees only what it can run plus a note
+# that more client-side commands are coming.
+func _cmd_help() -> void:
+	if _is_host:
+		_println("commands: help, start, give [all], players, wave, enemies [off|on|clear], clear")
+	else:
+		_println("commands: help, clear  (client — more client-side commands coming)")
 
 
 func _cmd_players() -> void:
