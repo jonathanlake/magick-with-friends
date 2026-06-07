@@ -185,6 +185,11 @@ func _process(delta: float) -> void:
 			direction = (aim_point - origin).normalized()
 		if _wand.try_cast(origin, direction):
 			play_cast_anim.rpc()
+			# First-person cosmetic: a straight bolt from just ahead of the camera through the crosshair,
+			# so the caster's own shot reads dead-center. The networked bolt (muzzle-origin, hidden for
+			# the caster) is what others see leave the staff. Stops at the crosshair target (aim_point).
+			var fp_origin := cam_pos + aim * 0.5
+			_wand.spawn_local_fp_tracer(fp_origin, aim, fp_origin.distance_to(aim_point))
 
 
 # Owning-peer movement on the physics clock. CharacterBody3D velocity model: gravity + jump on Y,

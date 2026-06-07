@@ -20,5 +20,15 @@ func muzzle_color() -> Color:
 	return Color.WHITE
 
 
+## Visual params for the caster's local first-person tracer (cosmetic). Defaults here; BlendSpell
+## reads them from its Form so the tracer matches the real projectile's speed/lifetime.
+func projectile_speed() -> float:
+	return 28.0
+
+
+func projectile_lifetime() -> float:
+	return 3.0
+
+
 func describe() -> String:
 	return display_name

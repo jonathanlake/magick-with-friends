@@ -159,11 +159,14 @@ server; all systems read from `GameManager.config`. Natural home for future run/
 ### First-Person Camera (current)
 
 The player ships a **first-person** rig (camera on the player body). **Casting aims forward** from the
-camera, but the projectile + muzzle flash **spawn from a `Muzzle` Marker3D on the staff** (under
-`CameraRig/Camera3D`), not the face — read on the owning peer (where the camera is live) and passed
-into `WandComponent.try_cast` → host spawn. No ground-cursor in the slice. The
-climbing/parkour camera path has been **removed**. Cast *feel* on clients is immediate local
-cosmetic feedback (muzzle flash), decoupled from host-authoritative resolution.
+camera. The **networked** projectile + muzzle flash **spawn from a `Muzzle` Marker3D on the staff**
+(under `CameraRig/Camera3D`) — read on the owning peer (where the camera is live) and passed into
+`WandComponent.try_cast` → host spawn — so *other* players see the bolt leave the staff. A **FP/TP
+dual-visual** split fixes the caster's own view: the networked bolt's mesh is **hidden for the caster**
+(`projectile.gd`), and the caster instead sees a **local `SpellTracer`** fired dead-straight from
+screen-center through the crosshair (`WandComponent.spawn_local_fp_tracer`). The hidden networked bolt
+still does all the damage; the tracer is cosmetic-only, never networked. No ground-cursor in the slice.
+The climbing/parkour camera path has been **removed**.
 
 ### Animation (LocomotionAnimator + AnimationTree)
 
@@ -275,8 +278,11 @@ entities/
                                 capsule collider, NameLabel, camera. (WandComponent is added in code.)
     player_visual.tscn        — The visible rig: KayKit Mage (.glb) + an AnimationTree (BlendTree:
                                 idle↔run BlendSpace1D + a OneShot cast) + LocomotionAnimator. BUILT.
-  projectiles/                — projectile.gd/.tscn: host-spawned + host-resolved spell
-                                projectile (Area3D). BUILT.
+  projectiles/                — projectile.gd/.tscn: host-spawned + host-resolved spell projectile
+                                (Area3D); its mesh is hidden for the caster (FP dual-visual). BUILT.
+                                spell_tracer.gd: a LOCAL-only first-person cosmetic bolt the caster sees
+                                fly straight from screen-center (the networked bolt — hidden for them —
+                                leaves the staff so others see that). Cosmetic, never networked. BUILT.
   enemies/                    — enemy_base.gd/.tscn: EnemyBase (CharacterBody3D + HealthComponent +
                                 HitFlashComponent; host AI: gravity / steer / cooldown'd melee;
                                 authors replicated `anim_speed` + `face_yaw`; attack-swing RPC).

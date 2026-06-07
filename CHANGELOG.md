@@ -7,6 +7,20 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ---
 
+## 2026-06-07 (casting polish)
+
+*Two-window playtest follow-ups*
+
+### ✨ Features
+
+- **First-person shots go dead-center.** The bolt used to leave the side-mounted staff and angle in
+  toward the crosshair (it only converged downrange). Now the caster sees a **straight cosmetic bolt
+  from screen-center through the crosshair**, while the real (networked) bolt — hidden for the caster
+  — still flies from the **staff** so teammates see it leave the staff. The standard FP/TP dual-visual
+  split; the hidden networked bolt still does all the damage.
+
+---
+
 ## 2026-06-06 (casting feedback + console)
 
 *Playtest-prep polish from user feedback*

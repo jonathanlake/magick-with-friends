@@ -18,6 +18,9 @@ extends Node
 @export var equipped_spell: Spell
 @export var cast_delay_sec: float = 0.35
 
+# Preloaded (not class_name) so the isolated --check-only gate doesn't false-error on the sibling type.
+const _SPELL_TRACER := preload("res://entities/projectiles/spell_tracer.gd")
+
 # Catalog indices for the equipped blend; set by player.gd before this node enters the tree.
 var form_idx: int = 0
 var element_idx: int = 0
@@ -65,6 +68,19 @@ func request_set_blend(new_form_idx: int, new_element_idx: int) -> void:
 		_host_apply_set_blend(new_form_idx, new_element_idx)
 	else:
 		_request_set_blend.rpc_id(1, new_form_idx, new_element_idx)
+
+
+# First-person cosmetic bolt: a straight tracer from the camera through the crosshair, so the caster
+# sees their shot go dead-center. The real networked projectile (hidden for the caster, see
+# projectile.gd) flies from the staff muzzle so OTHER players see it leave the staff. Caster-only —
+# player.gd calls this on the authority peer. max_dist stops the tracer at the crosshair target.
+func spawn_local_fp_tracer(origin: Vector3, direction: Vector3, max_dist: float) -> void:
+	if equipped_spell == null:
+		return
+	var tracer := _SPELL_TRACER.new()
+	get_tree().current_scene.add_child(tracer)
+	tracer.setup(origin, direction, equipped_spell.projectile_speed(), equipped_spell.muzzle_color(),
+		equipped_spell.projectile_lifetime(), max_dist)
 
 
 # ── Local cosmetic feedback (caster's screen only — never affects game state) ──
