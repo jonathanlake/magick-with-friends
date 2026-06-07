@@ -38,6 +38,12 @@ extends Node3D
 ## Optional OneShot request parameter (e.g. "parameters/OneShot/request") for a one-shot layered over
 ## locomotion (the enemy attack). Empty = no one-shot, so fire_oneshot() is a no-op (the player).
 @export var oneshot_request_param: String = ""
+## Optional bone-track paths the OneShot should drive (e.g. "Rig/Skeleton3D:spine"). When set, _ready
+## enables filtering on the OneShot and marks these tracks, so the one-shot plays ONLY on them (the
+## player's upper body) while the rest stay on locomotion (legs keep running). Empty = full-body
+## one-shot (the enemy). Set in CODE because the AnimationNode filter sub-properties don't reliably
+## deserialize from a hand-authored .tscn; a plain string array does.
+@export var oneshot_filter_paths: PackedStringArray = PackedStringArray()
 ## Optional spine bone to pitch up/down from a fed look-angle (see feed_pitch). Empty = no pitch, so
 ## feed_pitch() is a no-op (the enemy leaves it empty for now). When set, _ready attaches a
 ## SpinePitchModifier to the model's Skeleton3D so the torso/head/staff tilt while legs stay planted.
@@ -45,6 +51,12 @@ extends Node3D
 ## Clamp + axis-flip forwarded to the SpinePitchModifier (rig-dependent tuning).
 @export var spine_max_pitch_deg: float = 45.0
 @export var spine_invert_pitch: bool = false
+## Optional hand/staff bone to spawn casts from (e.g. "handslot.r"). When set, _ready attaches a
+## BoneAttachment3D to the model's Skeleton3D and exposes staff_muzzle_position(), so the networked
+## projectile leaves the model's actual staff (what OTHER players see) instead of a camera-relative
+## point. Empty = unavailable (the caller falls back). staff_muzzle_offset nudges grip -> tip.
+@export var staff_bone: String = ""
+@export var staff_muzzle_offset: Vector3 = Vector3.ZERO
 
 const _SPINE_PITCH_MODIFIER := preload("res://components/spine_pitch_modifier.gd")
 
@@ -57,6 +69,7 @@ var _use_external: bool = false
 # SpinePitchModifier instance (untyped: keep the sibling class_name out of static analysis so the
 # isolated --check-only gate doesn't false-error on it; it's configured via the preload const below).
 var _pitch_modifier: Node = null
+var _staff_attach: BoneAttachment3D = null
 
 
 func _ready() -> void:
@@ -68,7 +81,55 @@ func _ready() -> void:
 	_tree.active = true
 	_last_pos = global_position
 	_has_last_pos = true
+	_setup_oneshot_filter()
 	_setup_spine_pitch()
+	_setup_staff_muzzle()
+
+
+# Attach a BoneAttachment3D to the staff/hand bone so casts can spawn from the model's actual staff.
+# Works even while the visual is hidden (FP): hiding a node doesn't stop processing, so the
+# AnimationTree keeps posing the skeleton and the attachment tracks. No-op when staff_bone is unset.
+func _setup_staff_muzzle() -> void:
+	if staff_bone == "":
+		return
+	var skel := _find_skeleton(self)
+	if skel == null:
+		push_warning("LocomotionAnimator: staff_bone set but no Skeleton3D found under %s" % name)
+		return
+	var att := BoneAttachment3D.new()
+	skel.add_child(att)
+	att.bone_name = staff_bone
+	_staff_attach = att
+
+
+## World-space spawn point on the staff (bone position + a local offset toward the tip). Returns
+## Vector3.INF when unavailable, so the caller falls back to a camera-relative origin.
+func staff_muzzle_position() -> Vector3:
+	if _staff_attach == null:
+		return Vector3.INF
+	return _staff_attach.to_global(staff_muzzle_offset)
+
+
+# Restrict the OneShot to the given bone tracks (the upper body) so the one-shot plays only there and
+# the legs keep their locomotion. Set via the API (not the .tscn) because the filter sub-properties
+# don't reliably deserialize from a hand-authored scene — filter_enabled would load but the entries
+# wouldn't, leaving an EMPTY filter that masks the one-shot off the whole body.
+func _setup_oneshot_filter() -> void:
+	if oneshot_filter_paths.is_empty() or oneshot_request_param == "":
+		return
+	# "parameters/OneShot/request" -> node name "OneShot".
+	var parts := oneshot_request_param.split("/")
+	if parts.size() < 2:
+		return
+	var blend_tree := _tree.tree_root as AnimationNodeBlendTree
+	if blend_tree == null:
+		return
+	var node: AnimationNode = blend_tree.get_node(parts[1])
+	if node == null:
+		return
+	node.set_filter_enabled(true)
+	for p in oneshot_filter_paths:
+		node.set_filter_path(NodePath(p), true)
 
 
 # Attach a SpinePitchModifier to the model's Skeleton3D (post-animation, so it composes on top of the

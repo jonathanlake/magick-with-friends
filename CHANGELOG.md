@@ -7,6 +7,23 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ---
 
+## 2026-06-07 (casting fixes)
+
+*Fixing two regressions/gaps the two-window playtest caught*
+
+### 🛡️ Stability & Netcode
+
+- **Cast animation plays again.** The upper-body filter shipped last round silently broke the cast
+  gesture: `filter_enabled` loaded from the `.tscn` but the per-bone filter entries didn't, leaving an
+  empty filter that masked the cast off the whole body. The filter is now set in **code** (verifiable
+  headlessly), so the cast plays on the torso/arms while the legs keep running.
+- **Bolt leaves the actual staff (third person).** The networked bolt spawned from a camera-relative
+  point (near the head), so to teammates it looked like it came from the face. It now spawns from the
+  mage's **staff bone** (a `BoneAttachment3D` on the hand), so other players see it leave the staff.
+  First-person aim is unchanged (still the dead-center local tracer).
+
+---
+
 ## 2026-06-07 (casting polish)
 
 *Two-window playtest follow-ups*
