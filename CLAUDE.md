@@ -112,8 +112,9 @@ multiplayer finds and routes to the right node.
 Godot 4 `MultiplayerSynchronizer` replication modes used here:
 
 - **Mode 1** (`REPLICATION_MODE_ALWAYS`) — syncs every physics frame. Used for `global_position`
-  and the **animation drivers**: player `aim_yaw` + `anim_speed`, enemy `face_yaw` + `anim_speed`
-  (the owning peer authors them; every peer animates/faces from the replicated value — see Animation).
+  and the **animation drivers**: player `aim_yaw` + `aim_pitch` + `anim_speed`, enemy `face_yaw` +
+  `anim_speed` (the owning peer authors them; every peer animates/faces/tilts from the replicated
+  value — see Animation).
 - **Mode 2** (`REPLICATION_MODE_ON_CHANGE`) — syncs only when value changes. Used for the
   synced input fields in `PlayerInputSynchronizerComponent`.
 
@@ -188,6 +189,15 @@ Players and enemies use KayKit models (gitignored `/assets/`) animated through o
   peer calls `play_cast_anim.rpc()` when a cast actually fires (the player node's authority IS its
   owner, so the same RPC shape works) — the local FP caster's Visual is hidden, so it's remotes that
   see the gesture.
+- **Look-pitch** (player): the upper body tilts up/down to where the player aims. The owner authors
+  `aim_pitch` (= camera pitch), it **replicates (mode 1)** like `aim_yaw`, and every peer
+  `feed_pitch()`s the animator → a `SpinePitchModifier` (a `SkeletonModifier3D`, built/attached in code
+  to the model's `Skeleton3D`) rotates the `spine` bone *after* the AnimationTree, so the torso/head/
+  staff tilt while the legs (parented under `hips`, a sibling) stay planted. Opt-in per visual via the
+  `spine_pitch_bone` export (empty on the enemy = no-op, same as the OneShot pattern). NOTE: a
+  `SkeletonModifier3D`'s on-screen effect is **not observable from the headless smoke gate** (it lands
+  in the post-mixer skeleton pass the harness can't sample) — verify it in the two-window run; axis/
+  sign/clamp are tunable via `max_pitch_deg` / `invert_pitch`.
 - **Looping** on Idle/Run is set in the glb **import dock** (author action, not code); the attack clip
   stays **non-looping** so the OneShot ends and returns to locomotion.
 
@@ -246,8 +256,13 @@ components/
                                 peer, replicates it (mode 2). Syncs `movement_vector` (WASD) +
                                 `is_jump_pressed`. Cast is RPC-driven; interact is roadmap.
   locomotion_animator.gd      — Reusable script on a visual scene root. Drives a locomotion
-                                BlendSpace1D (idle↔run) from a fed speed, and fires a OneShot
-                                (`fire_oneshot`) for a layered action. See Animation below. BUILT.
+                                BlendSpace1D (idle↔run) from a fed speed, fires a OneShot
+                                (`fire_oneshot`) for a layered action, and (opt-in via
+                                `spine_pitch_bone`) attaches a SpinePitchModifier fed by `feed_pitch`.
+                                See Animation below. BUILT.
+  spine_pitch_modifier.gd     — SkeletonModifier3D: tilts one bone (the player's `spine`) up/down by a
+                                fed look-pitch, after the AnimationTree, so the torso aims while legs
+                                stay planted. Attached in code by locomotion_animator. BUILT.
 
 entities/
   player/

@@ -38,6 +38,15 @@ extends Node3D
 ## Optional OneShot request parameter (e.g. "parameters/OneShot/request") for a one-shot layered over
 ## locomotion (the enemy attack). Empty = no one-shot, so fire_oneshot() is a no-op (the player).
 @export var oneshot_request_param: String = ""
+## Optional spine bone to pitch up/down from a fed look-angle (see feed_pitch). Empty = no pitch, so
+## feed_pitch() is a no-op (the enemy leaves it empty for now). When set, _ready attaches a
+## SpinePitchModifier to the model's Skeleton3D so the torso/head/staff tilt while legs stay planted.
+@export var spine_pitch_bone: String = ""
+## Clamp + axis-flip forwarded to the SpinePitchModifier (rig-dependent tuning).
+@export var spine_max_pitch_deg: float = 45.0
+@export var spine_invert_pitch: bool = false
+
+const _SPINE_PITCH_MODIFIER := preload("res://components/spine_pitch_modifier.gd")
 
 var _tree: AnimationTree
 var _last_pos: Vector3
@@ -45,6 +54,9 @@ var _blend: float = 0.0
 var _has_last_pos: bool = false
 var _external_speed: float = 0.0
 var _use_external: bool = false
+# SpinePitchModifier instance (untyped: keep the sibling class_name out of static analysis so the
+# isolated --check-only gate doesn't false-error on it; it's configured via the preload const below).
+var _pitch_modifier: Node = null
 
 
 func _ready() -> void:
@@ -56,6 +68,34 @@ func _ready() -> void:
 	_tree.active = true
 	_last_pos = global_position
 	_has_last_pos = true
+	_setup_spine_pitch()
+
+
+# Attach a SpinePitchModifier to the model's Skeleton3D (post-animation, so it composes on top of the
+# locomotion/one-shot pose). No-op when spine_pitch_bone is unset, or if the model has no Skeleton3D.
+func _setup_spine_pitch() -> void:
+	if spine_pitch_bone == "":
+		return
+	var skel := _find_skeleton(self)
+	if skel == null:
+		push_warning("LocomotionAnimator: spine_pitch_bone set but no Skeleton3D found under %s" % name)
+		return
+	var mod := _SPINE_PITCH_MODIFIER.new()
+	mod.bone_name = spine_pitch_bone
+	mod.max_pitch_deg = spine_max_pitch_deg
+	mod.invert_pitch = spine_invert_pitch
+	skel.add_child(mod)
+	_pitch_modifier = mod
+
+
+func _find_skeleton(node: Node) -> Skeleton3D:
+	if node is Skeleton3D:
+		return node
+	for c in node.get_children():
+		var r := _find_skeleton(c)
+		if r != null:
+			return r
+	return null
 
 
 ## Feed the locomotion speed (world units/sec) from an external, network-smooth source — the
@@ -65,6 +105,13 @@ func _ready() -> void:
 func feed_speed(speed: float) -> void:
 	_external_speed = speed
 	_use_external = true
+
+
+## Feed the look-pitch (radians) for the spine modifier — the owning peer authors it from its camera
+## and replicates it, so every peer tilts the model the same. No-op when spine_pitch_bone is unset.
+func feed_pitch(pitch: float) -> void:
+	if _pitch_modifier != null:
+		_pitch_modifier.pitch = pitch
 
 
 ## Fire the configured OneShot (the attack swing), crossfading it over whatever locomotion is playing

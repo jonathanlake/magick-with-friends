@@ -27,6 +27,11 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
   still **lands on the crosshair** — a camera raycast finds the real target (wall/enemy/floor) and the
   bolt aims from the muzzle to that point, so it converges dead-center at any range instead of drifting
   off the offset origin. Origin is read on the casting peer and passed to the host spawn.
+- **Characters tilt to where they're looking (up/down).** The mage now pitches its upper body to the
+  player's look-angle — so teammates can read where you're aiming and up/down casts look right (before,
+  the model stood flat while the bolt flew up). Built as a `SkeletonModifier3D` on the `spine` bone
+  (legs stay planted), driven by a new replicated `aim_pitch` (same owner-authors / mode-1 pattern as
+  the facing yaw). Enemies can opt in later; the tilt itself is verified in the two-window run.
 
 ### 🛡️ Stability & Netcode
 

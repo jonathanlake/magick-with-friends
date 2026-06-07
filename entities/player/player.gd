@@ -34,6 +34,10 @@ var element_idx: int = 0
 # can face the model where the player is actually looking. The body itself is never rotated (the
 # camera handles look), so we rotate the Visual node by this instead.
 var aim_yaw: float = 0.0
+# Replicated look-pitch (camera up/down angle, radians). Same driver pattern as aim_yaw: the owning
+# peer authors it, it replicates (mode 1), and every peer feeds it to the Visual's spine-pitch
+# modifier so the model tilts its upper body to where the player is looking (legs stay planted).
+var aim_pitch: float = 0.0
 # Replicated planar speed (world units/sec), authored by the owning peer from its real velocity and
 # synced outward (see player.tscn). The Visual's LocomotionAnimator blends idle<->run from THIS
 # instead of differentiating position, so remote copies get a steady value rather than a stepped
@@ -125,11 +129,14 @@ func _input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	if not is_multiplayer_authority():
 		# Remote copy: orient the visible model to the replicated look-yaw (body is angular-locked),
-		# and feed it the replicated speed (steady value -> no remote blend jitter).
+		# feed it the replicated speed (steady value -> no remote blend jitter), and the replicated
+		# look-pitch so the upper body tilts to where this player is aiming.
 		if _visual:
 			_visual.rotation.y = aim_yaw
 			if _visual.has_method("feed_speed"):
 				_visual.feed_speed(anim_speed)
+			if _visual.has_method("feed_pitch"):
+				_visual.feed_pitch(aim_pitch)
 		return
 
 	var target := global_position + Vector3(0.0, camera_height, 0.0)
@@ -137,12 +144,15 @@ func _process(delta: float) -> void:
 	_camera_rig.global_rotation.y = _camera_yaw
 	_camera.rotation.x = _camera_pitch
 
-	# Publish our look-yaw for remotes, and face our own (FP-hidden) model the same way.
+	# Publish our look-yaw + look-pitch for remotes, and drive our own (FP-hidden) model the same way.
 	aim_yaw = _camera_yaw
+	aim_pitch = _camera_pitch
 	if _visual:
 		_visual.rotation.y = aim_yaw
 		if _visual.has_method("feed_speed"):
 			_visual.feed_speed(anim_speed)
+		if _visual.has_method("feed_pitch"):
+			_visual.feed_pitch(aim_pitch)
 
 	if _dead:
 		return
