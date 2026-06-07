@@ -7,6 +7,18 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ---
 
+## 2026-06-07 (casting polish)
+
+*Two-window playtest follow-ups*
+
+### ✨ Features
+
+- **Cast while running without skating.** Casting used to freeze the legs (the full-body cast clip
+  replaced locomotion), so you slid around mid-cast. The cast one-shot is now **bone-filtered to the
+  upper body** — torso/arms/head/staff play the cast while the legs keep running/idling underneath.
+
+---
+
 ## 2026-06-06 (casting feedback + console)
 
 *Playtest-prep polish from user feedback*
