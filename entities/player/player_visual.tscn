@@ -37,6 +37,7 @@ animation_tree_path = NodePath("AnimationTree")
 run_speed = 6.0
 blend_param = "parameters/Loco/blend_position"
 oneshot_request_param = "parameters/OneShot/request"
+spine_pitch_bone = "spine"
 
 [node name="mage" parent="." unique_id=268867569 instance=ExtResource("1_mage")]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, -0.9, 0)

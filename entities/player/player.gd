@@ -34,6 +34,10 @@ var element_idx: int = 0
 # can face the model where the player is actually looking. The body itself is never rotated (the
 # camera handles look), so we rotate the Visual node by this instead.
 var aim_yaw: float = 0.0
+# Replicated look-pitch (camera up/down angle, radians). Same driver pattern as aim_yaw: the owning
+# peer authors it, it replicates (mode 1), and every peer feeds it to the Visual's spine-pitch
+# modifier so the model tilts its upper body to where the player is looking (legs stay planted).
+var aim_pitch: float = 0.0
 # Replicated planar speed (world units/sec), authored by the owning peer from its real velocity and
 # synced outward (see player.tscn). The Visual's LocomotionAnimator blends idle<->run from THIS
 # instead of differentiating position, so remote copies get a steady value rather than a stepped
@@ -53,6 +57,10 @@ var anim_speed: float = 0.0
 # (where the camera is live), so a Camera3D-child marker is correct even though remotes don't run the
 # camera. Falls back to a camera-forward offset if the marker is missing.
 @onready var _muzzle: Marker3D = get_node_or_null("CameraRig/Camera3D/Muzzle")
+
+# Aim-raycast mask: world(1) + players(2) + enemies(4) = 7, so the crosshair ray hits whatever is
+# actually there. (Raw collision-layer bits, per the named layers in project.godot.)
+const _AIM_MASK := 7
 
 var _camera_yaw: float = 0.0
 var _camera_pitch: float = 0.0
@@ -121,11 +129,14 @@ func _input(event: InputEvent) -> void:
 func _process(delta: float) -> void:
 	if not is_multiplayer_authority():
 		# Remote copy: orient the visible model to the replicated look-yaw (body is angular-locked),
-		# and feed it the replicated speed (steady value -> no remote blend jitter).
+		# feed it the replicated speed (steady value -> no remote blend jitter), and the replicated
+		# look-pitch so the upper body tilts to where this player is aiming.
 		if _visual:
 			_visual.rotation.y = aim_yaw
 			if _visual.has_method("feed_speed"):
 				_visual.feed_speed(anim_speed)
+			if _visual.has_method("feed_pitch"):
+				_visual.feed_pitch(aim_pitch)
 		return
 
 	var target := global_position + Vector3(0.0, camera_height, 0.0)
@@ -133,12 +144,15 @@ func _process(delta: float) -> void:
 	_camera_rig.global_rotation.y = _camera_yaw
 	_camera.rotation.x = _camera_pitch
 
-	# Publish our look-yaw for remotes, and face our own (FP-hidden) model the same way.
+	# Publish our look-yaw + look-pitch for remotes, and drive our own (FP-hidden) model the same way.
 	aim_yaw = _camera_yaw
+	aim_pitch = _camera_pitch
 	if _visual:
 		_visual.rotation.y = aim_yaw
 		if _visual.has_method("feed_speed"):
 			_visual.feed_speed(anim_speed)
+		if _visual.has_method("feed_pitch"):
+			_visual.feed_pitch(aim_pitch)
 
 	if _dead:
 		return
@@ -150,17 +164,25 @@ func _process(delta: float) -> void:
 	_prev_jump_pressed = jump_now
 
 	# Cast: read locally on the authority peer; the wand gates by its own cooldown. Spawn from the
-	# staff muzzle (not the face), but AIM from the muzzle toward a far point on the camera ray so the
-	# shot converges on the crosshair — aiming straight camera-forward from an offset muzzle would put
-	# every shot ~0.4u down-right of the target. Fan the cast gesture to all peers only when a cast
-	# actually fired (try_cast returns true), so remotes see the swing on real casts.
+	# staff muzzle (not the face), but AIM from the muzzle toward the point the crosshair is actually
+	# on — a camera raycast finds the real target (wall/enemy/floor) so the shot converges there at any
+	# range. Aiming at a FIXED far point made close shots land off-center; the real-target ray fixes
+	# that. Fan the cast gesture to all peers only when a cast actually fired (try_cast returns true).
 	if _wand and Input.is_action_pressed("cast") and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var aim := -_camera.global_transform.basis.z
-		var origin := _camera.global_position + aim * 0.6
+		var cam_pos := _camera.global_position
+		# Raycast down the camera's line of sight; aim_point is the hit (the crosshair target) or the
+		# far fallback when the ray hits nothing. Exclude our own body so we don't aim at ourselves.
+		var aim_point := cam_pos + aim * cast_aim_distance
+		var query := PhysicsRayQueryParameters3D.create(cam_pos, aim_point, _AIM_MASK, [get_rid()])
+		var hit := get_world_3d().direct_space_state.intersect_ray(query)
+		if hit:
+			aim_point = hit.position
+		var origin := cam_pos + aim * 0.6
 		var direction := aim
 		if _muzzle:
 			origin = _muzzle.global_position
-			direction = (_camera.global_position + aim * cast_aim_distance - origin).normalized()
+			direction = (aim_point - origin).normalized()
 		if _wand.try_cast(origin, direction):
 			play_cast_anim.rpc()
 
