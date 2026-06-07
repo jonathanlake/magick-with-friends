@@ -54,6 +54,10 @@ var anim_speed: float = 0.0
 # camera. Falls back to a camera-forward offset if the marker is missing.
 @onready var _muzzle: Marker3D = get_node_or_null("CameraRig/Camera3D/Muzzle")
 
+# Aim-raycast mask: world(1) + players(2) + enemies(4) = 7, so the crosshair ray hits whatever is
+# actually there. (Raw collision-layer bits, per the named layers in project.godot.)
+const _AIM_MASK := 7
+
 var _camera_yaw: float = 0.0
 var _camera_pitch: float = 0.0
 var _prev_jump_pressed: bool = false
@@ -150,17 +154,25 @@ func _process(delta: float) -> void:
 	_prev_jump_pressed = jump_now
 
 	# Cast: read locally on the authority peer; the wand gates by its own cooldown. Spawn from the
-	# staff muzzle (not the face), but AIM from the muzzle toward a far point on the camera ray so the
-	# shot converges on the crosshair — aiming straight camera-forward from an offset muzzle would put
-	# every shot ~0.4u down-right of the target. Fan the cast gesture to all peers only when a cast
-	# actually fired (try_cast returns true), so remotes see the swing on real casts.
+	# staff muzzle (not the face), but AIM from the muzzle toward the point the crosshair is actually
+	# on — a camera raycast finds the real target (wall/enemy/floor) so the shot converges there at any
+	# range. Aiming at a FIXED far point made close shots land off-center; the real-target ray fixes
+	# that. Fan the cast gesture to all peers only when a cast actually fired (try_cast returns true).
 	if _wand and Input.is_action_pressed("cast") and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var aim := -_camera.global_transform.basis.z
-		var origin := _camera.global_position + aim * 0.6
+		var cam_pos := _camera.global_position
+		# Raycast down the camera's line of sight; aim_point is the hit (the crosshair target) or the
+		# far fallback when the ray hits nothing. Exclude our own body so we don't aim at ourselves.
+		var aim_point := cam_pos + aim * cast_aim_distance
+		var query := PhysicsRayQueryParameters3D.create(cam_pos, aim_point, _AIM_MASK, [get_rid()])
+		var hit := get_world_3d().direct_space_state.intersect_ray(query)
+		if hit:
+			aim_point = hit.position
+		var origin := cam_pos + aim * 0.6
 		var direction := aim
 		if _muzzle:
 			origin = _muzzle.global_position
-			direction = (_camera.global_position + aim * cast_aim_distance - origin).normalized()
+			direction = (aim_point - origin).normalized()
 		if _wand.try_cast(origin, direction):
 			play_cast_anim.rpc()
 
