@@ -159,13 +159,16 @@ server; all systems read from `GameManager.config`. Natural home for future run/
 ### First-Person Camera (current)
 
 The player ships a **first-person** rig (camera on the player body). **Casting aims forward** from the
-camera. The **networked** projectile + muzzle flash **spawn from a `Muzzle` Marker3D on the staff**
-(under `CameraRig/Camera3D`) — read on the owning peer (where the camera is live) and passed into
-`WandComponent.try_cast` → host spawn — so *other* players see the bolt leave the staff. A **FP/TP
-dual-visual** split fixes the caster's own view: the networked bolt's mesh is **hidden for the caster**
-(`projectile.gd`), and the caster instead sees a **local `SpellTracer`** fired dead-straight from
-screen-center through the crosshair (`WandComponent.spawn_local_fp_tracer`). The hidden networked bolt
-still does all the damage; the tracer is cosmetic-only, never networked. No ground-cursor in the slice.
+camera. The **networked** projectile + muzzle flash **spawn from the model's actual staff bone** — a
+`BoneAttachment3D` on `handslot.r` (built in code by `LocomotionAnimator` from the `staff_bone` export,
+exposed via `staff_muzzle_position()`) — read on the owning peer and passed into
+`WandComponent.try_cast` → host spawn, so *other* players see the bolt leave the staff. (It tracks even
+though the caster's own Visual is hidden — hiding a node doesn't stop the AnimationTree posing the
+skeleton.) A **FP/TP dual-visual** split fixes the caster's own view: the networked bolt's mesh is
+**hidden for the caster** (`projectile.gd`), and the caster instead sees a **local `SpellTracer`** fired
+dead-straight from screen-center through the crosshair (`WandComponent.spawn_local_fp_tracer`). The
+hidden networked bolt still does all the damage; the tracer is cosmetic-only, never networked. No
+ground-cursor in the slice.
 The climbing/parkour camera path has been **removed**.
 
 ### Animation (LocomotionAnimator + AnimationTree)
@@ -192,6 +195,14 @@ Players and enemies use KayKit models (gitignored `/assets/`) animated through o
   peer calls `play_cast_anim.rpc()` when a cast actually fires (the player node's authority IS its
   owner, so the same RPC shape works) — the local FP caster's Visual is hidden, so it's remotes that
   see the gesture.
+- **Upper-body cast** (player): the cast OneShot is **bone-filtered to the upper body** so the legs
+  keep running underneath (no skating). The filter is set in **code** (`LocomotionAnimator._ready` →
+  `set_filter_path` for each track in the `oneshot_filter_paths` export, e.g. `Rig/Skeleton3D:spine`),
+  NOT in the `.tscn` — the `AnimationNodeOneShot` filter sub-properties **don't reliably deserialize
+  from a hand-authored scene** (`filter_enabled` loads but the entries don't, leaving an empty filter
+  that masks the cast off the *whole* body — that regression is why the cast briefly stopped playing).
+  Checked tracks = the OneShot drives them; unchecked legs/hips stay on Loco. Verify headless with
+  `is_path_filtered`.
 - **Look-pitch** (player): the upper body tilts up/down to where the player aims. The owner authors
   `aim_pitch` (= camera pitch), it **replicates (mode 1)** like `aim_yaw`, and every peer
   `feed_pitch()`s the animator → a `SpinePitchModifier` (a `SkeletonModifier3D`, built/attached in code
@@ -260,8 +271,10 @@ components/
                                 `is_jump_pressed`. Cast is RPC-driven; interact is roadmap.
   locomotion_animator.gd      — Reusable script on a visual scene root. Drives a locomotion
                                 BlendSpace1D (idle↔run) from a fed speed, fires a OneShot
-                                (`fire_oneshot`) for a layered action, and (opt-in via
-                                `spine_pitch_bone`) attaches a SpinePitchModifier fed by `feed_pitch`.
+                                (`fire_oneshot`) for a layered action, code-sets the OneShot's
+                                upper-body filter (`oneshot_filter_paths`), and (opt-in) attaches a
+                                SpinePitchModifier (`spine_pitch_bone`, fed by `feed_pitch`) + a staff
+                                BoneAttachment3D (`staff_bone`, read via `staff_muzzle_position()`).
                                 See Animation below. BUILT.
   spine_pitch_modifier.gd     — SkeletonModifier3D: tilts one bone (the player's `spine`) up/down by a
                                 fed look-pitch, after the AnimationTree, so the torso aims while legs

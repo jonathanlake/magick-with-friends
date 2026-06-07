@@ -52,11 +52,6 @@ var anim_speed: float = 0.0
 # local first-person player; shown for remote copies so teammates see this player's body. Also
 # rotated by aim_yaw so the model faces the look direction.
 @onready var _visual: Node3D = $Visual
-# Spell origin marker on the staff (under the Camera3D so it tracks the full look direction). Casts
-# spawn the projectile + muzzle flash from here instead of the camera/face. Read on the OWNING peer
-# (where the camera is live), so a Camera3D-child marker is correct even though remotes don't run the
-# camera. Falls back to a camera-forward offset if the marker is missing.
-@onready var _muzzle: Marker3D = get_node_or_null("CameraRig/Camera3D/Muzzle")
 
 # Aim-raycast mask: world(1) + players(2) + enemies(4) = 7, so the crosshair ray hits whatever is
 # actually there. (Raw collision-layer bits, per the named layers in project.godot.)
@@ -163,11 +158,10 @@ func _process(delta: float) -> void:
 		_jump_queued = true
 	_prev_jump_pressed = jump_now
 
-	# Cast: read locally on the authority peer; the wand gates by its own cooldown. Spawn from the
-	# staff muzzle (not the face), but AIM from the muzzle toward the point the crosshair is actually
-	# on — a camera raycast finds the real target (wall/enemy/floor) so the shot converges there at any
-	# range. Aiming at a FIXED far point made close shots land off-center; the real-target ray fixes
-	# that. Fan the cast gesture to all peers only when a cast actually fired (try_cast returns true).
+	# Cast: read locally on the authority peer; the wand gates by its own cooldown. The networked bolt
+	# spawns from the model's actual STAFF bone (so other players see it leave the staff) and AIMs at
+	# the point the crosshair is on — a camera raycast finds the real target (wall/enemy/floor) so the
+	# shot converges there at any range. Fan the cast gesture to all peers only when a cast fired.
 	if _wand and Input.is_action_pressed("cast") and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var aim := -_camera.global_transform.basis.z
 		var cam_pos := _camera.global_position
@@ -178,11 +172,14 @@ func _process(delta: float) -> void:
 		var hit := get_world_3d().direct_space_state.intersect_ray(query)
 		if hit:
 			aim_point = hit.position
+		# Origin = the staff bone on the visual (tracks the model's hand). Fallback: a camera-forward
+		# point if the staff muzzle isn't available. Direction converges from the origin on the target.
 		var origin := cam_pos + aim * 0.6
-		var direction := aim
-		if _muzzle:
-			origin = _muzzle.global_position
-			direction = (aim_point - origin).normalized()
+		if _visual and _visual.has_method("staff_muzzle_position"):
+			var sp: Vector3 = _visual.staff_muzzle_position()
+			if sp.is_finite():
+				origin = sp
+		var direction := (aim_point - origin).normalized()
 		if _wand.try_cast(origin, direction):
 			play_cast_anim.rpc()
 			# First-person cosmetic: a straight bolt from just ahead of the camera through the crosshair,

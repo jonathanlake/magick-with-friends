@@ -21,18 +21,6 @@ min_space = 0.0
 value_label = "speed"
 
 [sub_resource type="AnimationNodeOneShot" id="OneShot_cast"]
-filter_enabled = true
-filters/"Rig/Skeleton3D:spine" = true
-filters/"Rig/Skeleton3D:chest" = true
-filters/"Rig/Skeleton3D:head" = true
-filters/"Rig/Skeleton3D:upperarm.l" = true
-filters/"Rig/Skeleton3D:lowerarm.l" = true
-filters/"Rig/Skeleton3D:hand.l" = true
-filters/"Rig/Skeleton3D:handslot.l" = true
-filters/"Rig/Skeleton3D:upperarm.r" = true
-filters/"Rig/Skeleton3D:lowerarm.r" = true
-filters/"Rig/Skeleton3D:hand.r" = true
-filters/"Rig/Skeleton3D:handslot.r" = true
 
 [sub_resource type="AnimationNodeBlendTree" id="BlendTree_player"]
 nodes/Loco/node = SubResource("AnimationNodeBlendSpace1D_loco")
@@ -49,8 +37,10 @@ animation_tree_path = NodePath("AnimationTree")
 run_speed = 6.0
 blend_param = "parameters/Loco/blend_position"
 oneshot_request_param = "parameters/OneShot/request"
+oneshot_filter_paths = PackedStringArray("Rig/Skeleton3D:spine", "Rig/Skeleton3D:chest", "Rig/Skeleton3D:head", "Rig/Skeleton3D:upperarm.l", "Rig/Skeleton3D:lowerarm.l", "Rig/Skeleton3D:hand.l", "Rig/Skeleton3D:handslot.l", "Rig/Skeleton3D:upperarm.r", "Rig/Skeleton3D:lowerarm.r", "Rig/Skeleton3D:hand.r", "Rig/Skeleton3D:handslot.r")
 spine_pitch_bone = "spine"
 spine_invert_pitch = true
+staff_bone = "handslot.r"
 
 [node name="mage" parent="." unique_id=268867569 instance=ExtResource("1_mage")]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, -0.9, 0)
