@@ -13,6 +13,10 @@ extends CharacterBody3D
 @export var camera_height: float = 0.75
 @export var camera_smoothing: float = 15.0
 @export var mouse_sensitivity: float = 0.003
+# Casts spawn at the staff muzzle but aim toward a point this far down the camera ray, so the shot
+# converges on the crosshair instead of flying parallel to it (offset by the muzzle's position).
+# Larger = flatter convergence; should comfortably exceed normal engagement range.
+@export var cast_aim_distance: float = 100.0
 
 # Set by the spawner before _enter_tree. Must be applied in _enter_tree (not _ready)
 # so MultiplayerSynchronizer children register with the correct authority on tree entry.
@@ -146,12 +150,18 @@ func _process(delta: float) -> void:
 	_prev_jump_pressed = jump_now
 
 	# Cast: read locally on the authority peer; the wand gates by its own cooldown. Spawn from the
-	# staff muzzle (not the face); aim stays camera-forward. Fan the cast gesture to all peers only
-	# when a cast actually fired (try_cast returns true), so remotes see the swing on real casts.
+	# staff muzzle (not the face), but AIM from the muzzle toward a far point on the camera ray so the
+	# shot converges on the crosshair — aiming straight camera-forward from an offset muzzle would put
+	# every shot ~0.4u down-right of the target. Fan the cast gesture to all peers only when a cast
+	# actually fired (try_cast returns true), so remotes see the swing on real casts.
 	if _wand and Input.is_action_pressed("cast") and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		var aim := -_camera.global_transform.basis.z
-		var origin := _muzzle.global_position if _muzzle else _camera.global_position + aim * 0.6
-		if _wand.try_cast(origin, aim):
+		var origin := _camera.global_position + aim * 0.6
+		var direction := aim
+		if _muzzle:
+			origin = _muzzle.global_position
+			direction = (_camera.global_position + aim * cast_aim_distance - origin).normalized()
+		if _wand.try_cast(origin, direction):
 			play_cast_anim.rpc()
 
 
