@@ -3,14 +3,14 @@
 [ext_resource type="PackedScene" uid="uid://roymm0vtk6mf" path="res://assets/models/mage/mage.glb" id="1_mage"]
 [ext_resource type="Script" uid="uid://dtnl4kl6gk7p4" path="res://components/locomotion_animator.gd" id="2_anim"]
 
+[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_cast"]
+animation = &"Spellcast_Shoot"
+
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_idle"]
 animation = &"Idle"
 
 [sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_run"]
 animation = &"Running_A"
-
-[sub_resource type="AnimationNodeAnimation" id="AnimationNodeAnimation_cast"]
-animation = &"Spellcast_Shoot"
 
 [sub_resource type="AnimationNodeBlendSpace1D" id="AnimationNodeBlendSpace1D_loco"]
 blend_point_0/node = SubResource("AnimationNodeAnimation_idle")
@@ -21,6 +21,18 @@ min_space = 0.0
 value_label = "speed"
 
 [sub_resource type="AnimationNodeOneShot" id="OneShot_cast"]
+filter_enabled = true
+filters/"Rig/Skeleton3D:spine" = true
+filters/"Rig/Skeleton3D:chest" = true
+filters/"Rig/Skeleton3D:head" = true
+filters/"Rig/Skeleton3D:upperarm.l" = true
+filters/"Rig/Skeleton3D:lowerarm.l" = true
+filters/"Rig/Skeleton3D:hand.l" = true
+filters/"Rig/Skeleton3D:handslot.l" = true
+filters/"Rig/Skeleton3D:upperarm.r" = true
+filters/"Rig/Skeleton3D:lowerarm.r" = true
+filters/"Rig/Skeleton3D:hand.r" = true
+filters/"Rig/Skeleton3D:handslot.r" = true
 
 [sub_resource type="AnimationNodeBlendTree" id="BlendTree_player"]
 nodes/Loco/node = SubResource("AnimationNodeBlendSpace1D_loco")
@@ -38,6 +50,7 @@ run_speed = 6.0
 blend_param = "parameters/Loco/blend_position"
 oneshot_request_param = "parameters/OneShot/request"
 spine_pitch_bone = "spine"
+spine_invert_pitch = true
 
 [node name="mage" parent="." unique_id=268867569 instance=ExtResource("1_mage")]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, -0.9, 0)
@@ -47,3 +60,7 @@ active = false
 root_node = NodePath("../mage")
 tree_root = SubResource("BlendTree_player")
 anim_player = NodePath("../mage/AnimationPlayer")
+parameters/Loco/blend_position = 0.0
+parameters/OneShot/active = false
+parameters/OneShot/internal_active = false
+parameters/OneShot/request = 0
