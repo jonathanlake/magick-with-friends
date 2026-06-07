@@ -39,16 +39,19 @@ func can_cast() -> bool:
 	return _cooldown <= 0.0 and equipped_spell != null
 
 
-## Called on the authority peer (the caster) with a world-space origin + direction.
-func try_cast(origin: Vector3, direction: Vector3) -> void:
+## Called on the authority peer (the caster) with a world-space origin + direction. Returns true if a
+## cast actually fired (cooldown allowed it), so the caller can drive cast feedback (the player's cast
+## animation) only on real casts — not every frame the button is held.
+func try_cast(origin: Vector3, direction: Vector3) -> bool:
 	if not can_cast():
-		return
+		return false
 	_cooldown = cast_delay_sec
 	_spawn_local_muzzle_flash(origin, equipped_spell.muzzle_color())
 	if multiplayer.is_server():
 		equipped_spell.cast_on_host(get_tree().current_scene, origin, direction, multiplayer.get_unique_id())
 	else:
 		_request_cast.rpc_id(1, origin, direction)
+	return true
 
 
 func current_spell_text() -> String:

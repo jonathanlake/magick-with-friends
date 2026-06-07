@@ -17,6 +17,22 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
   the full command set, a client gets `help`/`clear` (host-only commands print "host only"), with a
   `_HOST_ONLY` seam ready for future client-side commands. Each peer's console suspends only its own
   input while open (already per-peer).
+### ✨ Features
+
+- **Players cast with a gesture now.** The mage plays a `Spellcast_Shoot` one-shot over locomotion
+  when a cast actually fires — same BlendTree+OneShot shape the skeleton already uses for its attack.
+  Replicated owner→all (cosmetic), so teammates see you cast.
+- **Spells come out of the staff, not your face.** A `Muzzle` Marker3D on the staff (under the camera)
+  is now the projectile + muzzle-flash origin, instead of a point in front of the camera. The shot
+  still **converges on the crosshair** — it aims from the muzzle toward a far point on the camera ray,
+  so the offset origin doesn't make shots drift down-right of where you're looking. Origin is read on
+  the casting peer and passed to the host spawn.
+### 🛡️ Stability & Netcode
+
+- **DoT no longer strobes the screen.** A fire burn deals ~10 damage ticks/sec, and each one fired a
+  fresh first-person red flash — so a single DoT machine-gunned the screen. The self-damage pulse is
+  now throttled (one calm pulse per ~0.4s window, tunable), so a fresh hit still reads instantly but a
+  sustained burn doesn't flicker.
 
 ---
 

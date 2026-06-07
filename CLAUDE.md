@@ -157,8 +157,10 @@ server; all systems read from `GameManager.config`. Natural home for future run/
 
 ### First-Person Camera (current)
 
-The player ships a **first-person** rig (camera on the player body). **Casting aims forward**
-from the camera (a forward raycast / muzzle spawn point) — no ground-cursor in the slice. The
+The player ships a **first-person** rig (camera on the player body). **Casting aims forward** from the
+camera, but the projectile + muzzle flash **spawn from a `Muzzle` Marker3D on the staff** (under
+`CameraRig/Camera3D`), not the face — read on the owning peer (where the camera is live) and passed
+into `WandComponent.try_cast` → host spawn. No ground-cursor in the slice. The
 climbing/parkour camera path has been **removed**. Cast *feel* on clients is immediate local
 cosmetic feedback (muzzle flash), decoupled from host-authoritative resolution.
 
@@ -168,10 +170,11 @@ Players and enemies use KayKit models (gitignored `/assets/`) animated through o
 `components/locomotion_animator.gd` on each **visual scene root** (`player_visual.tscn` /
 `enemy_visual.tscn`):
 
-- **Tree shape.** The animator reads an `AnimationTree`. Player: a bare **BlendSpace1D** (Idle↔Run by
-  speed). Enemy: a **BlendTree** = the same BlendSpace1D "Loco" feeding an **AnimationNodeOneShot**
-  whose shot is the attack clip — `blend_param` / `oneshot_request_param` exports point at the right
-  nested params (`parameters/Loco/blend_position`, `parameters/OneShot/request`).
+- **Tree shape.** The animator reads an `AnimationTree`. Both player and enemy use the SAME shape now:
+  a **BlendTree** = a BlendSpace1D "Loco" (Idle↔Run by speed) feeding an **AnimationNodeOneShot** whose
+  shot is a one-off action clip — enemy = the melee attack (`1H_Melee_Attack_Chop`), player = the cast
+  gesture (`Spellcast_Shoot`). `blend_param` / `oneshot_request_param` exports point at the right nested
+  params (`parameters/Loco/blend_position`, `parameters/OneShot/request`).
 - **Replicate the DRIVER, never the animation.** The idiomatic Godot multiplayer rule (and the cause
   of a real jitter bug we fixed): **don't differentiate a replicated `global_position`** to get speed
   — a remote body's position arrives in held network snapshots, so differentiating it sawtooths the
@@ -180,8 +183,11 @@ Players and enemies use KayKit models (gitignored `/assets/`) animated through o
   facing yaw (`aim_yaw` player / `face_yaw` enemy) — these **replicate (mode 1)**, and every peer
   `feed_speed()`s the animator + rotates the visual from the steady value. Sample on the **physics
   clock** (not `_process`), the same clock the body moves on.
-- **One-shots** (enemy attack) fan out cosmetically: the host calls `play_attack_anim.rpc()`
-  (`authority, call_local` — the host owns the enemy) → every peer `fire_oneshot()`s.
+- **One-shots** fan out cosmetically via `authority, call_local` RPC → every peer `fire_oneshot()`s.
+  Enemy attack: the host calls `play_attack_anim.rpc()` (host owns the enemy). Player cast: the OWNING
+  peer calls `play_cast_anim.rpc()` when a cast actually fires (the player node's authority IS its
+  owner, so the same RPC shape works) — the local FP caster's Visual is hidden, so it's remotes that
+  see the gesture.
 - **Looping** on Idle/Run is set in the glb **import dock** (author action, not code); the attack clip
   stays **non-looping** so the OneShot ends and returns to locomotion.
 
@@ -252,8 +258,8 @@ entities/
     player.tscn               — FP body, InputSync, MultiplayerSynchronizer, HealthComponent,
                                 HitFlashComponent, a `Visual` instance of player_visual.tscn,
                                 capsule collider, NameLabel, camera. (WandComponent is added in code.)
-    player_visual.tscn        — The visible rig: KayKit Mage (.glb) + an AnimationTree (idle↔run
-                                BlendSpace1D) + LocomotionAnimator. Editable art/anim scene. BUILT.
+    player_visual.tscn        — The visible rig: KayKit Mage (.glb) + an AnimationTree (BlendTree:
+                                idle↔run BlendSpace1D + a OneShot cast) + LocomotionAnimator. BUILT.
   projectiles/                — projectile.gd/.tscn: host-spawned + host-resolved spell
                                 projectile (Area3D). BUILT.
   enemies/                    — enemy_base.gd/.tscn: EnemyBase (CharacterBody3D + HealthComponent +
