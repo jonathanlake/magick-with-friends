@@ -13,6 +13,11 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ### ✨ Features
 
+- **First-person shots go dead-center.** The bolt used to leave the side-mounted staff and angle in
+  toward the crosshair (it only converged downrange). Now the caster sees a **straight cosmetic bolt
+  from screen-center through the crosshair**, while the real (networked) bolt — hidden for the caster
+  — still flies from the **staff** so teammates see it leave the staff. The standard FP/TP dual-visual
+  split; the hidden networked bolt still does all the damage.
 - **Cast while running without skating.** Casting used to freeze the legs (the full-body cast clip
   replaced locomotion), so you slid around mid-cast. The cast one-shot is now **bone-filtered to the
   upper body** — torso/arms/head/staff play the cast while the legs keep running/idling underneath.

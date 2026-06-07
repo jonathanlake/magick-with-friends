@@ -58,6 +58,12 @@ func _ready() -> void:
 		mesh.material_override = mat
 		if _explode:
 			mesh.scale = Vector3.ONE * 1.8   # bursts read as a bigger, heavier orb
+		# First-person dual-visual: hide the networked bolt for the CASTER — they see a straight local
+		# tracer from the camera instead (SpellTracer), while everyone else sees this bolt leave the
+		# staff. Collision/damage are unaffected (Area3D monitoring is independent of mesh visibility),
+		# so the host still resolves the hit from this networked projectile.
+		if _owner_peer == multiplayer.get_unique_id():
+			mesh.visible = false
 
 
 func _physics_process(delta: float) -> void:

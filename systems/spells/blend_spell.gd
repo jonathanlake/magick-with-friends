@@ -37,6 +37,14 @@ func muzzle_color() -> Color:
 	return element.color if element else Color.WHITE
 
 
+func projectile_speed() -> float:
+	return form.projectile_speed if form else 28.0
+
+
+func projectile_lifetime() -> float:
+	return form.projectile_lifetime_sec if form else 3.0
+
+
 func describe() -> String:
 	if display_name != "Spell" and display_name != "":
 		return display_name
