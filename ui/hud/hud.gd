@@ -112,7 +112,9 @@ func show_damage_flash() -> void:
 	# every tick and strobes. One calm pulse per window instead (a fresh hit after the window still
 	# fires immediately).
 	var now := Time.get_ticks_msec()
-	if now - _last_damage_flash_ms < int(damage_flash_min_interval_sec * 1000.0):
+	# maxf guards a negative @export: a negative window would make this check always-false and silently
+	# suppress EVERY flash; clamping to 0 means "no throttle" (every hit pulses) instead.
+	if now - _last_damage_flash_ms < int(maxf(damage_flash_min_interval_sec, 0.0) * 1000.0):
 		return
 	_last_damage_flash_ms = now
 	if _damage_tween and _damage_tween.is_valid():
