@@ -7,6 +7,19 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ---
 
+## 2026-06-06 (casting feedback + console)
+
+*Playtest-prep polish from user feedback*
+
+### 🛡️ Stability & Netcode
+
+- **DoT no longer strobes the screen.** A fire burn deals ~10 damage ticks/sec, and each one fired a
+  fresh first-person red flash — so a single DoT machine-gunned the screen. The self-damage pulse is
+  now throttled (one calm pulse per ~0.4s window, tunable), so a fresh hit still reads instantly but a
+  sustained burn doesn't flicker.
+
+---
+
 ## 2026-06-06 (scope pass)
 
 *Trimmed the slice toward the playtest, after two external reviews*
