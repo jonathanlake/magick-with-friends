@@ -24,6 +24,11 @@ extends Node3D
 ## authored .tscn — they come back null; see CLAUDE.md). Looping on the Idle/Run clips is set in the
 ## glb import dock (one-time author action), not here.
 
+## Fires `oneshot_release_time_sec` after a one-shot is triggered — the "release" moment in the gesture
+## (e.g. when the cast bolt should launch). Fires on every peer that played the gesture; listeners
+## guard authority themselves.
+signal oneshot_released
+
 ## The AnimationTree whose tree_root is a BlendSpace1D (idle at min, run at max).
 @export var animation_tree_path: NodePath
 ## Speed (world units/sec) that maps to a full run. ~ the entity's max move speed. Below it, the
@@ -38,6 +43,11 @@ extends Node3D
 ## Optional OneShot request parameter (e.g. "parameters/OneShot/request") for a one-shot layered over
 ## locomotion (the enemy attack). Empty = no one-shot, so fire_oneshot() is a no-op (the player).
 @export var oneshot_request_param: String = ""
+## Seconds into the one-shot at which `oneshot_released` fires — the "release" frame where a cast/swing
+## should actually do its thing (spawn the bolt), not the start. Read it off the clip by scrubbing to
+## the release frame. 0 = fire immediately on trigger. Keep it ≤ the caster's cast cooldown so a new
+## one-shot can't start before the previous one releases.
+@export var oneshot_release_time_sec: float = 0.0
 ## Optional bone-track paths the OneShot should drive (e.g. "Rig/Skeleton3D:spine"). When set, _ready
 ## enables filtering on the OneShot and marks these tracks, so the one-shot plays ONLY on them (the
 ## player's upper body) while the rest stay on locomotion (legs keep running). Empty = full-body
@@ -181,6 +191,18 @@ func feed_pitch(pitch: float) -> void:
 func fire_oneshot() -> void:
 	if _tree != null and oneshot_request_param != "":
 		_tree.set(oneshot_request_param, AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
+		# Emit the release at the designer-set time into the gesture (or now, if 0). A code timer is
+		# used instead of an in-clip Call Method Track: those are unreliable on imported-glb clips
+		# played through an AnimationTree (Godot #49776/#48526). One-shot connection so it self-cleans.
+		if oneshot_release_time_sec > 0.0:
+			get_tree().create_timer(oneshot_release_time_sec).timeout.connect(
+				_emit_oneshot_released, CONNECT_ONE_SHOT)
+		else:
+			oneshot_released.emit()
+
+
+func _emit_oneshot_released() -> void:
+	oneshot_released.emit()
 
 
 func _physics_process(delta: float) -> void:

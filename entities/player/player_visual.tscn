@@ -37,6 +37,7 @@ animation_tree_path = NodePath("AnimationTree")
 run_speed = 6.0
 blend_param = "parameters/Loco/blend_position"
 oneshot_request_param = "parameters/OneShot/request"
+oneshot_release_time_sec = 0.25
 oneshot_filter_paths = PackedStringArray("Rig/Skeleton3D:spine", "Rig/Skeleton3D:chest", "Rig/Skeleton3D:head", "Rig/Skeleton3D:upperarm.l", "Rig/Skeleton3D:lowerarm.l", "Rig/Skeleton3D:hand.l", "Rig/Skeleton3D:handslot.l", "Rig/Skeleton3D:upperarm.r", "Rig/Skeleton3D:lowerarm.r", "Rig/Skeleton3D:hand.r", "Rig/Skeleton3D:handslot.r")
 spine_pitch_bone = "spine"
 spine_invert_pitch = true

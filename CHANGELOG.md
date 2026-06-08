@@ -7,6 +7,21 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ---
 
+## 2026-06-07 (cast timing)
+
+*Fire the bolt at the gesture's release, not on button-press*
+
+### ✨ Features
+
+- **Casts launch at the right moment.** The bolt used to spawn the instant you pressed cast (the start
+  of the gesture). Now pressing cast commits it + plays the gesture, and the bolt actually fires at a
+  designer-set **release point** mid-gesture (`oneshot_release_time_sec`, tuned by scrubbing the clip),
+  leaving the staff at that pose and aimed where you're looking at that instant. Reads far better and
+  the wind-up quietly masks cast latency. (Driven by a code-timed signal, not an in-clip event track —
+  those are unreliable on imported animations played through an AnimationTree.)
+
+---
+
 ## 2026-06-07 (casting fixes)
 
 *Fixing two regressions/gaps the two-window playtest caught*

@@ -159,12 +159,18 @@ server; all systems read from `GameManager.config`. Natural home for future run/
 ### First-Person Camera (current)
 
 The player ships a **first-person** rig (camera on the player body). **Casting aims forward** from the
-camera. The **networked** projectile + muzzle flash **spawn from the model's actual staff bone** — a
-`BoneAttachment3D` on `handslot.r` (built in code by `LocomotionAnimator` from the `staff_bone` export,
-exposed via `staff_muzzle_position()`) — read on the owning peer and passed into
-`WandComponent.try_cast` → host spawn, so *other* players see the bolt leave the staff. (It tracks even
-though the caster's own Visual is hidden — hiding a node doesn't stop the AnimationTree posing the
-skeleton.) A **FP/TP dual-visual** split fixes the caster's own view: the networked bolt's mesh is
+camera. **The cast fires at the gesture's RELEASE frame, not on input:** pressing cast commits it
+(`WandComponent.begin_cast()` takes the cooldown) and plays the `Spellcast_Shoot` gesture on all peers;
+`oneshot_release_time_sec` later the Visual emits `oneshot_released` and the owner spawns the bolt
+(`WandComponent.fire_cast()`), sampling the aim + staff position *at that instant*. (A code timer, not
+an in-clip Call Method Track — those are unreliable on imported-glb clips played through an
+AnimationTree.) The **networked** projectile + muzzle flash **spawn from the model's actual staff
+bone** — a `BoneAttachment3D` on `handslot.r` (built in code by `LocomotionAnimator` from the
+`staff_bone` export, exposed via `staff_muzzle_position()`) — read on the owning peer and passed into
+`fire_cast` → host spawn, so *other* players see the bolt leave the staff at the release moment. (It
+tracks even though the caster's own Visual is hidden — hiding a node doesn't stop the AnimationTree
+posing the skeleton.) A **FP/TP dual-visual** split fixes the caster's own view: the networked bolt's
+mesh is
 **hidden for the caster** (`projectile.gd`), and the caster instead sees a **local `SpellTracer`** fired
 dead-straight from screen-center through the crosshair (`WandComponent.spawn_local_fp_tracer`). The
 hidden networked bolt still does all the damage; the tracer is cosmetic-only, never networked. No

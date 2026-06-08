@@ -98,6 +98,11 @@ func _ready() -> void:
 	_camera_rig.global_position = global_position + Vector3(0.0, camera_height, 0.0)
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 
+	# The cast gesture fires its bolt at the animation's release frame, not on input. Only the owner
+	# spawns (remote copies play the gesture but have no listener here). See _on_cast_released.
+	if _visual and _visual.has_signal("oneshot_released"):
+		_visual.oneshot_released.connect(_on_cast_released)
+
 
 func _input(event: InputEvent) -> void:
 	if not is_multiplayer_authority():
@@ -158,35 +163,40 @@ func _process(delta: float) -> void:
 		_jump_queued = true
 	_prev_jump_pressed = jump_now
 
-	# Cast: read locally on the authority peer; the wand gates by its own cooldown. The networked bolt
-	# spawns from the model's actual STAFF bone (so other players see it leave the staff) and AIMs at
-	# the point the crosshair is on — a camera raycast finds the real target (wall/enemy/floor) so the
-	# shot converges there at any range. Fan the cast gesture to all peers only when a cast fired.
+	# Cast: pressing commits the cast (cooldown) and plays the gesture on all peers. The bolt itself is
+	# NOT spawned here — it fires at the gesture's RELEASE frame (see _on_cast_released), so it leaves
+	# the staff at the natural moment and uses where you're aiming at that instant.
 	if _wand and Input.is_action_pressed("cast") and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
-		var aim := -_camera.global_transform.basis.z
-		var cam_pos := _camera.global_position
-		# Raycast down the camera's line of sight; aim_point is the hit (the crosshair target) or the
-		# far fallback when the ray hits nothing. Exclude our own body so we don't aim at ourselves.
-		var aim_point := cam_pos + aim * cast_aim_distance
-		var query := PhysicsRayQueryParameters3D.create(cam_pos, aim_point, _AIM_MASK, [get_rid()])
-		var hit := get_world_3d().direct_space_state.intersect_ray(query)
-		if hit:
-			aim_point = hit.position
-		# Origin = the staff bone on the visual (tracks the model's hand). Fallback: a camera-forward
-		# point if the staff muzzle isn't available. Direction converges from the origin on the target.
-		var origin := cam_pos + aim * 0.6
-		if _visual and _visual.has_method("staff_muzzle_position"):
-			var sp: Vector3 = _visual.staff_muzzle_position()
-			if sp.is_finite():
-				origin = sp
-		var direction := (aim_point - origin).normalized()
-		if _wand.try_cast(origin, direction):
+		if _wand.begin_cast():
 			play_cast_anim.rpc()
-			# First-person cosmetic: a straight bolt from just ahead of the camera through the crosshair,
-			# so the caster's own shot reads dead-center. The networked bolt (muzzle-origin, hidden for
-			# the caster) is what others see leave the staff. Stops at the crosshair target (aim_point).
-			var fp_origin := cam_pos + aim * 0.5
-			_wand.spawn_local_fp_tracer(fp_origin, aim, fp_origin.distance_to(aim_point))
+
+
+# The cast gesture reached its release frame (fired by the Visual's oneshot_released). Spawn the bolt
+# NOW, from the staff at the release pose, aimed where the player is looking at this instant. Connected
+# only on the owner, but guard anyway since the gesture (and signal) play on every peer.
+func _on_cast_released() -> void:
+	if not is_multiplayer_authority() or _wand == null or _dead:
+		return
+	var aim := -_camera.global_transform.basis.z
+	var cam_pos := _camera.global_position
+	# Raycast down the camera's line of sight; aim_point is the crosshair target (or a far fallback).
+	var aim_point := cam_pos + aim * cast_aim_distance
+	var query := PhysicsRayQueryParameters3D.create(cam_pos, aim_point, _AIM_MASK, [get_rid()])
+	var hit := get_world_3d().direct_space_state.intersect_ray(query)
+	if hit:
+		aim_point = hit.position
+	# Origin = the staff bone on the visual (tracks the hand at the release pose). Fallback: camera-forward.
+	var origin := cam_pos + aim * 0.6
+	if _visual and _visual.has_method("staff_muzzle_position"):
+		var sp: Vector3 = _visual.staff_muzzle_position()
+		if sp.is_finite():
+			origin = sp
+	var direction := (aim_point - origin).normalized()
+	_wand.fire_cast(origin, direction)
+	# First-person cosmetic: a straight bolt from just ahead of the camera through the crosshair (the
+	# networked bolt is hidden for the caster; this is what they see). Stops at the crosshair target.
+	var fp_origin := cam_pos + aim * 0.5
+	_wand.spawn_local_fp_tracer(fp_origin, aim, fp_origin.distance_to(aim_point))
 
 
 # Owning-peer movement on the physics clock. CharacterBody3D velocity model: gravity + jump on Y,
