@@ -263,8 +263,8 @@ autoloads/
 components/
   health_component.gd/.tscn   — max_health (export, default 100), current_health, damage(int),
                                 died + damaged signals. Reused by players and enemies.
-  hit_flash_component.gd/.tscn — Reusable damage flash. @export target_mesh_path / flash_color /
-                                flash_duration_sec / health_component_path. Auto-wires to a
+  hit_flash_component.gd/.tscn — Reusable damage flash. @export target_root_path / flash_color /
+                                flash_duration_sec / health_component_path / skip_on_lethal. Auto-wires to a
                                 HealthComponent's `damaged`; host fans the cosmetic flash to all
                                 peers via an `any_peer` RPC (deliberate — see RPC Pattern exception:
                                 player nodes are client-owned). Used by players + enemies.
