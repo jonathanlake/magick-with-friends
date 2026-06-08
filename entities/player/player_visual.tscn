@@ -37,10 +37,13 @@ animation_tree_path = NodePath("AnimationTree")
 run_speed = 6.0
 blend_param = "parameters/Loco/blend_position"
 oneshot_request_param = "parameters/OneShot/request"
+oneshot_release_time_sec = 0.4
 oneshot_filter_paths = PackedStringArray("Rig/Skeleton3D:spine", "Rig/Skeleton3D:chest", "Rig/Skeleton3D:head", "Rig/Skeleton3D:upperarm.l", "Rig/Skeleton3D:lowerarm.l", "Rig/Skeleton3D:hand.l", "Rig/Skeleton3D:handslot.l", "Rig/Skeleton3D:upperarm.r", "Rig/Skeleton3D:lowerarm.r", "Rig/Skeleton3D:hand.r", "Rig/Skeleton3D:handslot.r")
 spine_pitch_bone = "spine"
 spine_invert_pitch = true
 staff_bone = "handslot.r"
+staff_muzzle_offset = Vector3(0, 1, 0)
+staff_muzzle_marker_path = NodePath("mage/Rig/Skeleton3D/StaffMuzzle/Tip")
 
 [node name="mage" parent="." unique_id=268867569 instance=ExtResource("1_mage")]
 transform = Transform3D(-1, 0, 0, 0, 1, 0, 0, 0, -1, 0, -0.9, 0)
@@ -54,3 +57,11 @@ parameters/Loco/blend_position = 0.0
 parameters/OneShot/active = false
 parameters/OneShot/internal_active = false
 parameters/OneShot/request = 0
+
+[node name="StaffMuzzle" type="BoneAttachment3D" parent="mage/Rig/Skeleton3D"]
+bone_name = "handslot.r"
+
+[node name="Tip" type="Marker3D" parent="mage/Rig/Skeleton3D/StaffMuzzle"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+
+[editable path="mage"]

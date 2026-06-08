@@ -24,6 +24,11 @@ extends Node3D
 ## authored .tscn — they come back null; see CLAUDE.md). Looping on the Idle/Run clips is set in the
 ## glb import dock (one-time author action), not here.
 
+## Fires `oneshot_release_time_sec` after a one-shot is triggered — the "release" moment in the gesture
+## (e.g. when the cast bolt should launch). Fires on every peer that played the gesture; listeners
+## guard authority themselves.
+signal oneshot_released
+
 ## The AnimationTree whose tree_root is a BlendSpace1D (idle at min, run at max).
 @export var animation_tree_path: NodePath
 ## Speed (world units/sec) that maps to a full run. ~ the entity's max move speed. Below it, the
@@ -38,6 +43,11 @@ extends Node3D
 ## Optional OneShot request parameter (e.g. "parameters/OneShot/request") for a one-shot layered over
 ## locomotion (the enemy attack). Empty = no one-shot, so fire_oneshot() is a no-op (the player).
 @export var oneshot_request_param: String = ""
+## Seconds into the one-shot at which `oneshot_released` fires — the "release" frame where a cast/swing
+## should actually do its thing (spawn the bolt), not the start. Read it off the clip by scrubbing to
+## the release frame. 0 = fire immediately on trigger. Keep it ≤ the caster's cast cooldown so a new
+## one-shot can't start before the previous one releases.
+@export var oneshot_release_time_sec: float = 0.0
 ## Optional bone-track paths the OneShot should drive (e.g. "Rig/Skeleton3D:spine"). When set, _ready
 ## enables filtering on the OneShot and marks these tracks, so the one-shot plays ONLY on them (the
 ## player's upper body) while the rest stay on locomotion (legs keep running). Empty = full-body
@@ -57,6 +67,11 @@ extends Node3D
 ## point. Empty = unavailable (the caller falls back). staff_muzzle_offset nudges grip -> tip.
 @export var staff_bone: String = ""
 @export var staff_muzzle_offset: Vector3 = Vector3.ZERO
+## PREFERRED muzzle source: an editor-placed Marker3D (drag it onto the staff tip in the viewport).
+## Put it under a BoneAttachment3D on the staff bone so it tracks the hand. When set + resolvable,
+## staff_muzzle_position() returns this node's global position; otherwise it falls back to the
+## code-built BoneAttachment3D + staff_muzzle_offset above. NodePath (not a typed node) per CLAUDE.md.
+@export var staff_muzzle_marker_path: NodePath = NodePath()
 
 const _SPINE_PITCH_MODIFIER := preload("res://components/spine_pitch_modifier.gd")
 
@@ -70,6 +85,7 @@ var _use_external: bool = false
 # isolated --check-only gate doesn't false-error on it; it's configured via the preload const below).
 var _pitch_modifier: Node = null
 var _staff_attach: BoneAttachment3D = null
+var _staff_marker: Node3D = null
 
 
 func _ready() -> void:
@@ -84,6 +100,8 @@ func _ready() -> void:
 	_setup_oneshot_filter()
 	_setup_spine_pitch()
 	_setup_staff_muzzle()
+	if not staff_muzzle_marker_path.is_empty():
+		_staff_marker = get_node_or_null(staff_muzzle_marker_path) as Node3D
 
 
 # Attach a BoneAttachment3D to the staff/hand bone so casts can spawn from the model's actual staff.
@@ -102,12 +120,15 @@ func _setup_staff_muzzle() -> void:
 	_staff_attach = att
 
 
-## World-space spawn point on the staff (bone position + a local offset toward the tip). Returns
-## Vector3.INF when unavailable, so the caller falls back to a camera-relative origin.
+## World-space spawn point on the staff. Prefers the editor-placed marker (drag it onto the tip);
+## falls back to the code-built BoneAttachment3D + staff_muzzle_offset. Returns Vector3.INF when
+## neither is available, so the caller uses a camera-relative origin.
 func staff_muzzle_position() -> Vector3:
-	if _staff_attach == null:
-		return Vector3.INF
-	return _staff_attach.to_global(staff_muzzle_offset)
+	if _staff_marker != null:
+		return _staff_marker.global_position
+	if _staff_attach != null:
+		return _staff_attach.to_global(staff_muzzle_offset)
+	return Vector3.INF
 
 
 # Restrict the OneShot to the given bone tracks (the upper body) so the one-shot plays only there and
@@ -181,6 +202,18 @@ func feed_pitch(pitch: float) -> void:
 func fire_oneshot() -> void:
 	if _tree != null and oneshot_request_param != "":
 		_tree.set(oneshot_request_param, AnimationNodeOneShot.ONE_SHOT_REQUEST_FIRE)
+		# Emit the release at the designer-set time into the gesture (or now, if 0). A code timer is
+		# used instead of an in-clip Call Method Track: those are unreliable on imported-glb clips
+		# played through an AnimationTree (Godot #49776/#48526). One-shot connection so it self-cleans.
+		if oneshot_release_time_sec > 0.0:
+			get_tree().create_timer(oneshot_release_time_sec).timeout.connect(
+				_emit_oneshot_released, CONNECT_ONE_SHOT)
+		else:
+			oneshot_released.emit()
+
+
+func _emit_oneshot_released() -> void:
+	oneshot_released.emit()
 
 
 func _physics_process(delta: float) -> void:

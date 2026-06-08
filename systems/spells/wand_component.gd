@@ -42,19 +42,40 @@ func can_cast() -> bool:
 	return _cooldown <= 0.0 and equipped_spell != null
 
 
-## Called on the authority peer (the caster) with a world-space origin + direction. Returns true if a
-## cast actually fired (cooldown allowed it), so the caller can drive cast feedback (the player's cast
-## animation) only on real casts — not every frame the button is held.
-func try_cast(origin: Vector3, direction: Vector3) -> bool:
+## Commit a cast on the authority peer: gate on cooldown, take the cooldown, and return whether it
+## committed (so the caller plays the gesture only on real casts). The actual effect is deferred to
+## fire_cast(), called at the gesture's release frame — the cooldown is taken HERE (at input) so the
+## button can't be spammed during the wind-up.
+func begin_cast() -> bool:
 	if not can_cast():
 		return false
 	_cooldown = cast_delay_sec
-	_spawn_local_muzzle_flash(origin, equipped_spell.muzzle_color())
+	return true
+
+
+## The host-authoritative networked bolt (what OTHER players see + the damage), fired at the gesture's
+## RELEASE frame from the staff. Direct on the host, RPC from a client. No cooldown logic and no local
+## cosmetics here — begin_cast() gated it, and the caster's instant feedback fires on input (fire_fp_cast).
+func fire_cast(origin: Vector3, direction: Vector3) -> void:
+	if equipped_spell == null:
+		return
 	if multiplayer.is_server():
 		equipped_spell.cast_on_host(get_tree().current_scene, origin, direction, multiplayer.get_unique_id())
 	else:
 		_request_cast.rpc_id(1, origin, direction)
-	return true
+
+
+## INSTANT first-person feedback, fired on input (caster's screen only): the muzzle flash + the local
+## straight SpellTracer through the crosshair. Decoupled from the networked bolt (fire_cast, at release)
+## so the shooter feels zero delay while others still see the bolt leave the staff at the gesture peak.
+func fire_fp_cast(origin: Vector3, direction: Vector3, max_dist: float) -> void:
+	if equipped_spell == null:
+		return
+	_spawn_local_muzzle_flash(origin, equipped_spell.muzzle_color())
+	var tracer := _SPELL_TRACER.new()
+	get_tree().current_scene.add_child(tracer)
+	tracer.setup(origin, direction, equipped_spell.projectile_speed(), equipped_spell.muzzle_color(),
+		equipped_spell.projectile_lifetime(), max_dist)
 
 
 func current_spell_text() -> String:
@@ -68,19 +89,6 @@ func request_set_blend(new_form_idx: int, new_element_idx: int) -> void:
 		_host_apply_set_blend(new_form_idx, new_element_idx)
 	else:
 		_request_set_blend.rpc_id(1, new_form_idx, new_element_idx)
-
-
-# First-person cosmetic bolt: a straight tracer from the camera through the crosshair, so the caster
-# sees their shot go dead-center. The real networked projectile (hidden for the caster, see
-# projectile.gd) flies from the staff muzzle so OTHER players see it leave the staff. Caster-only —
-# player.gd calls this on the authority peer. max_dist stops the tracer at the crosshair target.
-func spawn_local_fp_tracer(origin: Vector3, direction: Vector3, max_dist: float) -> void:
-	if equipped_spell == null:
-		return
-	var tracer := _SPELL_TRACER.new()
-	get_tree().current_scene.add_child(tracer)
-	tracer.setup(origin, direction, equipped_spell.projectile_speed(), equipped_spell.muzzle_color(),
-		equipped_spell.projectile_lifetime(), max_dist)
 
 
 # ── Local cosmetic feedback (caster's screen only — never affects game state) ──
