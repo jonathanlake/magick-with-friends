@@ -159,22 +159,21 @@ server; all systems read from `GameManager.config`. Natural home for future run/
 ### First-Person Camera (current)
 
 The player ships a **first-person** rig (camera on the player body). **Casting aims forward** from the
-camera. **The cast fires at the gesture's RELEASE frame, not on input:** pressing cast commits it
-(`WandComponent.begin_cast()` takes the cooldown) and plays the `Spellcast_Shoot` gesture on all peers;
-`oneshot_release_time_sec` later the Visual emits `oneshot_released` and the owner spawns the bolt
-(`WandComponent.fire_cast()`), sampling the aim + staff position *at that instant*. (A code timer, not
-an in-clip Call Method Track — those are unreliable on imported-glb clips played through an
-AnimationTree.) The **networked** projectile + muzzle flash **spawn from the model's actual staff
-bone** — a `BoneAttachment3D` on `handslot.r` (built in code by `LocomotionAnimator` from the
-`staff_bone` export, exposed via `staff_muzzle_position()`) — read on the owning peer and passed into
-`fire_cast` → host spawn, so *other* players see the bolt leave the staff at the release moment. (It
-tracks even though the caster's own Visual is hidden — hiding a node doesn't stop the AnimationTree
-posing the skeleton.) A **FP/TP dual-visual** split fixes the caster's own view: the networked bolt's
-mesh is
-**hidden for the caster** (`projectile.gd`), and the caster instead sees a **local `SpellTracer`** fired
-dead-straight from screen-center through the crosshair (`WandComponent.spawn_local_fp_tracer`). The
-hidden networked bolt still does all the damage; the tracer is cosmetic-only, never networked. No
-ground-cursor in the slice.
+camera. **FP and TP are decoupled** (the standard FP-viewmodel-vs-world-model split): pressing cast
+commits it (`WandComponent.begin_cast()` takes the cooldown), plays the `Spellcast_Shoot` gesture on
+all peers, and **immediately** fires the caster's first-person feedback — the muzzle flash + a local
+straight `SpellTracer` (`WandComponent.fire_fp_cast()`) — so the shooter feels zero delay. The
+**networked** bolt (what others see + the damage) fires later, at the gesture's RELEASE frame:
+`oneshot_release_time_sec` after the trigger the Visual emits `oneshot_released` and the owner calls
+`WandComponent.fire_cast()` → host spawn. (Release timing is a code timer, not an in-clip Call Method
+Track — those are unreliable on imported-glb clips played through an AnimationTree.) The networked bolt
+**spawns from the model's actual staff** — a `BoneAttachment3D` on `handslot.r` exposed via
+`LocomotionAnimator.staff_muzzle_position()`, **preferably an editor-placed `Marker3D`** (drag it onto
+the orb; `staff_muzzle_marker_path`), falling back to the code-built attachment + `staff_muzzle_offset`.
+It tracks even though the caster's own Visual is hidden (hiding a node doesn't stop the AnimationTree
+posing the skeleton). The **FP/TP dual-visual** split: the networked bolt's mesh is **hidden for the
+caster** (`projectile.gd`) so they only see their local tracer; the hidden networked bolt still does all
+the damage. The tracer is cosmetic-only, never networked. No ground-cursor in the slice.
 The climbing/parkour camera path has been **removed**.
 
 ### Animation (LocomotionAnimator + AnimationTree)

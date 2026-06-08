@@ -67,6 +67,11 @@ signal oneshot_released
 ## point. Empty = unavailable (the caller falls back). staff_muzzle_offset nudges grip -> tip.
 @export var staff_bone: String = ""
 @export var staff_muzzle_offset: Vector3 = Vector3.ZERO
+## PREFERRED muzzle source: an editor-placed Marker3D (drag it onto the staff tip in the viewport).
+## Put it under a BoneAttachment3D on the staff bone so it tracks the hand. When set + resolvable,
+## staff_muzzle_position() returns this node's global position; otherwise it falls back to the
+## code-built BoneAttachment3D + staff_muzzle_offset above. NodePath (not a typed node) per CLAUDE.md.
+@export var staff_muzzle_marker_path: NodePath = NodePath()
 
 const _SPINE_PITCH_MODIFIER := preload("res://components/spine_pitch_modifier.gd")
 
@@ -80,6 +85,7 @@ var _use_external: bool = false
 # isolated --check-only gate doesn't false-error on it; it's configured via the preload const below).
 var _pitch_modifier: Node = null
 var _staff_attach: BoneAttachment3D = null
+var _staff_marker: Node3D = null
 
 
 func _ready() -> void:
@@ -94,6 +100,8 @@ func _ready() -> void:
 	_setup_oneshot_filter()
 	_setup_spine_pitch()
 	_setup_staff_muzzle()
+	if not staff_muzzle_marker_path.is_empty():
+		_staff_marker = get_node_or_null(staff_muzzle_marker_path) as Node3D
 
 
 # Attach a BoneAttachment3D to the staff/hand bone so casts can spawn from the model's actual staff.
@@ -112,12 +120,15 @@ func _setup_staff_muzzle() -> void:
 	_staff_attach = att
 
 
-## World-space spawn point on the staff (bone position + a local offset toward the tip). Returns
-## Vector3.INF when unavailable, so the caller falls back to a camera-relative origin.
+## World-space spawn point on the staff. Prefers the editor-placed marker (drag it onto the tip);
+## falls back to the code-built BoneAttachment3D + staff_muzzle_offset. Returns Vector3.INF when
+## neither is available, so the caller uses a camera-relative origin.
 func staff_muzzle_position() -> Vector3:
-	if _staff_attach == null:
-		return Vector3.INF
-	return _staff_attach.to_global(staff_muzzle_offset)
+	if _staff_marker != null:
+		return _staff_marker.global_position
+	if _staff_attach != null:
+		return _staff_attach.to_global(staff_muzzle_offset)
+	return Vector3.INF
 
 
 # Restrict the OneShot to the given bone tracks (the upper body) so the one-shot plays only there and

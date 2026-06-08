@@ -7,18 +7,21 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ---
 
-## 2026-06-07 (cast timing)
+## 2026-06-07 (cast timing + FP/TP split)
 
-*Fire the bolt at the gesture's release, not on button-press*
+*Instant in first-person, gesture-timed for everyone else*
 
 ### ✨ Features
 
-- **Casts launch at the right moment.** The bolt used to spawn the instant you pressed cast (the start
-  of the gesture). Now pressing cast commits it + plays the gesture, and the bolt actually fires at a
-  designer-set **release point** mid-gesture (`oneshot_release_time_sec`, tuned by scrubbing the clip),
-  leaving the staff at that pose and aimed where you're looking at that instant. Reads far better and
-  the wind-up quietly masks cast latency. (Driven by a code-timed signal, not an in-clip event track —
-  those are unreliable on imported animations played through an AnimationTree.)
+- **Casting feels instant, and looks right to others.** First-person and third-person are now
+  decoupled (the standard FP-viewmodel split). The moment you press cast you get **instant** feedback —
+  muzzle flash + your straight tracer — so there's zero delay. Meanwhile the **networked bolt others
+  see + the damage** fires at a designer-set **release point** mid-gesture (`oneshot_release_time_sec`,
+  tuned by scrubbing the clip), so to teammates the bolt leaves the staff at the natural moment. (The
+  caster never sees the networked bolt — it's hidden for them — so there's no double.)
+- **The staff muzzle is now an editor-placed marker.** Instead of a blind offset, there's a draggable
+  `Marker3D` (`StaffMuzzle/Tip`) bone-attached to the staff hand — drag it onto the orb in the viewport
+  and the bolt launches from exactly there. (Code falls back to the old offset if the marker's absent.)
 
 ---
 
