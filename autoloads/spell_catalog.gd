@@ -10,6 +10,12 @@ extends Node
 var forms: Array[SpellForm] = []
 var elements: Array[SpellElement] = []
 
+# Per-element cast SFX (gitignored /assets/, like the character models). Preloaded by UID per the
+# CLAUDE.md asset rule. Element-driven, so Firebolt + Fireball share the Fire hiss, Spark +
+# Thunderclap share the Lightning crackle.
+const _FIRE_CAST_SFX := preload("uid://bhn712yhkf052")       # SFX_FireHissSwooshCrackles01.wav
+const _LIGHTNING_CAST_SFX := preload("uid://b6jvak6x1t17m")  # SFX_ElectricReleaseImpact01.wav
+
 # Themed [Element][Form] names, keyed "form_idx,element_idx". Falls back to "<Element> <Form>".
 const _NAMES := {
 	"0,0": "Firebolt",     # Projectile + Fire
@@ -87,6 +93,7 @@ func _fire() -> SpellElement:
 	e.reaction = SpellElement.Reaction.FIRE
 	e.burn_dps = 6
 	e.burn_duration_sec = 3.0
+	e.cast_sound = _FIRE_CAST_SFX
 	return e
 
 
@@ -99,4 +106,5 @@ func _lightning() -> SpellElement:
 	e.chain_count = 2
 	e.chain_range = 6.0
 	e.chain_falloff = 0.6
+	e.cast_sound = _LIGHTNING_CAST_SFX
 	return e

@@ -18,6 +18,15 @@ extends CharacterBody3D
 # Larger = flatter convergence; should comfortably exceed normal engagement range.
 @export var cast_aim_distance: float = 100.0
 
+# Cast SFX (the stream itself lives per-element on the SpellElement). Cosmetic, played locally on
+# every peer — never networked. The caster hears a non-positional 2D sound (always centered/full);
+# everyone else hears a positional 3D sound from the caster's body, so distance attenuates it. Flip
+# caster_audio_positional if the centered 2D feels detached and you want the caster's own sound 3D.
+@export var cast_sfx_volume_db: float = 0.0
+@export var cast_sfx_max_distance: float = 30.0   # 3D: past this, remotes can't hear the cast
+@export var cast_sfx_unit_size: float = 8.0       # 3D: distance it stays ~full before falling off
+@export var caster_audio_positional: bool = false
+
 # Set by the spawner before _enter_tree. Must be applied in _enter_tree (not _ready)
 # so MultiplayerSynchronizer children register with the correct authority on tree entry.
 var input_multiplayer_authority: int = 1
@@ -287,6 +296,38 @@ func _cycle_debug_spell() -> void:
 func play_cast_anim() -> void:
 	if _visual and _visual.has_method("fire_oneshot"):
 		_visual.fire_oneshot()
+	_play_cast_sfx()
+
+
+# Spawn-and-free a one-shot cast SFX (cosmetic, local to this peer — the cast event itself is what
+# replicates, via the play_cast_anim RPC). The caster (this node's authority) hears a non-positional
+# 2D sound — always centered + full; every other peer hears a positional 3D sound from this player's
+# body, so distance attenuates it. caster_audio_positional flips the caster onto the 3D path too.
+# Mirrors WandComponent's spawn->play->free-on-finished muzzle flash. Routed to the "SFX" bus.
+func _play_cast_sfx() -> void:
+	if _wand == null:
+		return
+	var stream: AudioStream = _wand.cast_sound()
+	if stream == null:
+		return
+	if is_multiplayer_authority() and not caster_audio_positional:
+		var p := AudioStreamPlayer.new()
+		p.stream = stream
+		p.bus = &"SFX"
+		p.volume_db = cast_sfx_volume_db
+		p.finished.connect(p.queue_free)
+		add_child(p)
+		p.play()
+	else:
+		var p3d := AudioStreamPlayer3D.new()
+		p3d.stream = stream
+		p3d.bus = &"SFX"
+		p3d.volume_db = cast_sfx_volume_db
+		p3d.max_distance = cast_sfx_max_distance
+		p3d.unit_size = cast_sfx_unit_size
+		p3d.finished.connect(p3d.queue_free)
+		add_child(p3d)
+		p3d.play()
 
 
 # Debug-only authority probe. Gated on the DEBUG autoload existing (it's disabled by default, no

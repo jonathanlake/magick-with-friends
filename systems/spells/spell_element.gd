@@ -12,6 +12,11 @@ enum Reaction { NONE, FIRE, LIGHTNING }
 @export var damage: int = 25
 @export var color: Color = Color(1.0, 0.45, 0.1)
 
+## Cosmetic cast SFX, played when a spell with this element is fired (per-element: Fire hisses,
+## Lightning crackles — the Form doesn't matter, so the Burst variants inherit it). Played locally
+## on every peer, never networked (the cast event replicates, each peer plays its own sound).
+@export var cast_sound: AudioStream
+
 @export var reaction: Reaction = Reaction.NONE
 
 ## Lightning chain tuning (reaction == LIGHTNING).
