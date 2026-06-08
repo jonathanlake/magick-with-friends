@@ -82,6 +82,12 @@ func current_spell_text() -> String:
 	return equipped_spell.describe() if equipped_spell else "(none)"
 
 
+## Cosmetic cast SFX for the equipped spell (its Element's stream). player.gd plays it on every peer
+## via the cast RPC; asking the wand keeps player.gd from reaching into equipped_spell directly.
+func cast_sound() -> AudioStream:
+	return equipped_spell.cast_sound() if equipped_spell else null
+
+
 ## Re-equip to a catalog (form, element). Called by the owning peer; resolves host-authoritatively
 ## and broadcasts so every peer rebuilds this wand identically. The seam pickups (item 6) reuse.
 func request_set_blend(new_form_idx: int, new_element_idx: int) -> void:

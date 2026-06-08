@@ -20,6 +20,12 @@ func muzzle_color() -> Color:
 	return Color.WHITE
 
 
+## Cosmetic cast SFX for this spell (played locally on every peer; never networked). BlendSpell
+## reads it from its Element.
+func cast_sound() -> AudioStream:
+	return null
+
+
 ## Visual params for the caster's local first-person tracer (cosmetic). Defaults here; BlendSpell
 ## reads them from its Form so the tracer matches the real projectile's speed/lifetime.
 func projectile_speed() -> float:

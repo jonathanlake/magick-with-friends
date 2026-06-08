@@ -37,6 +37,10 @@ func muzzle_color() -> Color:
 	return element.color if element else Color.WHITE
 
 
+func cast_sound() -> AudioStream:
+	return element.cast_sound if element else null
+
+
 func projectile_speed() -> float:
 	return form.projectile_speed if form else 28.0
 
