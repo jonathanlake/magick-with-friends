@@ -17,8 +17,15 @@ extends CharacterBody3D
 # network packets (mode 1, no interpolation); we glide the decoupled Visual toward it instead of
 # teleporting. The visual trails true position by ~speed/rate (~0.33 m at 6 u/s, rate 18). Higher =
 # snappier (less trail, more residual jitter); lower = floatier. Owner copies are NOT smoothed (their
-# Visual must stay exact for the staff-muzzle world read).
+# Visual must stay exact for the staff-muzzle world read). Clamped in RemoteVisualSmoother so 0/negative
+# can't freeze or diverge the lerp.
 @export var remote_smoothing_rate: float = 18.0
+# Gap (metres) above which a remote Visual SNAPS instead of gliding — only real teleports should trip
+# it, so keep it generous (well past the steady ~speed/rate trail) or a lag catch-up reads as a jump.
+@export var remote_snap_distance_m: float = 5.0
+# Safety cap (sec) on the post-respawn "park" window: how long the Visual holds at the spawn point
+# waiting for the body's teleport to replicate before it gives up and resumes normal smoothing.
+@export var respawn_park_timeout_sec: float = 1.0
 @export var mouse_sensitivity: float = 0.003
 # Casts spawn at the staff muzzle but aim toward a point this far down the camera ray, so the shot
 # converges on the crosshair instead of flying parallel to it (offset by the muzzle's position).
@@ -67,7 +74,7 @@ var anim_speed: float = 0.0
 # The visible body — an instance of player_visual.tscn (the model + animations). Hidden for the
 # local first-person player; shown for remote copies so teammates see this player's body. Also
 # rotated by aim_yaw so the model faces the look direction.
-@onready var _visual: Node3D = $Visual
+@onready var _visual: LocomotionAnimator = $Visual
 
 # Aim-raycast mask: world(1) + players(2) + enemies(4) = 7, so the crosshair ray hits whatever is
 # actually there. (Raw collision-layer bits, per the named layers in project.godot.)
@@ -79,6 +86,8 @@ var _prev_jump_pressed: bool = false
 var _jump_queued: bool = false
 var _wand: WandComponent
 var _dead: bool = false
+# Remote-copy visual smoother (created only on non-authority copies in _ready). Null on the owner.
+var _smoother: RemoteVisualSmoother
 
 
 func _enter_tree() -> void:
@@ -106,12 +115,14 @@ func _ready() -> void:
 
 	if not is_multiplayer_authority():
 		_camera.current = false
-		# Decouple the Visual from the snapped body transform so we can glide it toward the networked
-		# position (the synchronizer teleports the body between packets). top_level only on remote
-		# copies; the owner keeps the Visual parented + exact. Seed onto the body so it doesn't glide
-		# in from the origin on spawn.
+		# Decouple the Visual from the snapped body transform so the smoother can glide it toward the
+		# networked position (the synchronizer teleports the body between packets). top_level only on
+		# remote copies; the owner keeps the Visual parented + exact (staff-muzzle world read). Seed
+		# onto the body (position + facing) so it doesn't glide/spin in from the origin on spawn.
 		_visual.top_level = true
-		_visual.global_position = global_position
+		_smoother = RemoteVisualSmoother.new()
+		_smoother.setup(_visual, remote_smoothing_rate, remote_snap_distance_m, respawn_park_timeout_sec)
+		_smoother.seed(global_position, aim_yaw)
 		return
 
 	_camera.current = true
@@ -150,21 +161,11 @@ func _input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	if not is_multiplayer_authority():
-		# Remote copy: glide the decoupled Visual toward the snapped body position + facing (mode-1
-		# packets have no interpolation, so raw assignment teleports). Frame-rate-independent weight;
-		# snap on a large jump (respawn/teleport) so the body doesn't slide across the arena. Feed the
-		# replicated speed/pitch as before (steady drivers -> no remote blend jitter).
-		if _visual:
-			var w := 1.0 - exp(-remote_smoothing_rate * delta)
-			if _visual.global_position.distance_to(global_position) > 3.0:
-				_visual.global_position = global_position
-			else:
-				_visual.global_position = _visual.global_position.lerp(global_position, w)
-			_visual.rotation.y = lerp_angle(_visual.rotation.y, aim_yaw, w)
-			if _visual.has_method("feed_speed"):
-				_visual.feed_speed(anim_speed)
-			if _visual.has_method("feed_pitch"):
-				_visual.feed_pitch(aim_pitch)
+		# Remote copy: the smoother glides the decoupled Visual toward the snapped body position +
+		# facing and feeds the replicated anim drivers (mode-1 packets have no interpolation, so raw
+		# assignment teleports). See RemoteVisualSmoother.
+		if _smoother:
+			_smoother.smooth(global_position, aim_yaw, anim_speed, aim_pitch, delta)
 		return
 
 	var target := global_position + Vector3(0.0, camera_height, 0.0)
@@ -173,14 +174,14 @@ func _process(delta: float) -> void:
 	_camera.rotation.x = _camera_pitch
 
 	# Publish our look-yaw + look-pitch for remotes, and drive our own (FP-hidden) model the same way.
+	# The owner SNAPS rotation.y = aim_yaw (remotes lerp it via the smoother) and never routes through
+	# the smoother — its Visual must stay exact, since staff_muzzle_position() reads this skeleton to
+	# spawn the networked bolt. Any lag here would mis-aim casts.
 	aim_yaw = _camera_yaw
 	aim_pitch = _camera_pitch
-	if _visual:
-		_visual.rotation.y = aim_yaw
-		if _visual.has_method("feed_speed"):
-			_visual.feed_speed(anim_speed)
-		if _visual.has_method("feed_pitch"):
-			_visual.feed_pitch(aim_pitch)
+	_visual.rotation.y = aim_yaw
+	_visual.feed_speed(anim_speed)
+	_visual.feed_pitch(aim_pitch)
 
 	if _dead:
 		return
@@ -274,6 +275,10 @@ func _physics_process(delta: float) -> void:
 ## Toggled by Main on death / respawn. Hides the body + gates movement/input.
 func set_dead(dead: bool) -> void:
 	_dead = dead
+	# Disable the body's collider while down so the invisible corpse doesn't block teammates/enemies at
+	# the death spot (nothing depends on a dead player's collision — enemy AI + reactions filter
+	# is_dead()). set_deferred is physics-safe (applies at idle-frame end, never mid-callback).
+	$CollisionShape3D.set_deferred("disabled", dead)
 	if dead:
 		# _physics_process zeroes velocity + skips move_and_slide while dead; reset the replicated
 		# locomotion driver too so a stale (possibly running) blend doesn't flash on respawn.
@@ -285,6 +290,14 @@ func set_dead(dead: bool) -> void:
 		# Remote players show their body + name; the local first-person player keeps both hidden.
 		_visual.visible = not is_multiplayer_authority()
 		_name_label.visible = not is_multiplayer_authority()
+
+
+## Respawn (all peers): snap the remote Visual to the known spawn point and park it there until the
+## body's teleport replicates, so the model doesn't linger at the death spot or rubber-band. No-op on
+## the owner (no smoother; its Visual is hidden and its body is teleported synchronously by Main).
+func respawn_visual_to(spawn_pos: Vector3) -> void:
+	if _smoother:
+		_smoother.teleport(spawn_pos, aim_yaw)
 
 
 func is_dead() -> bool:
