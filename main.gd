@@ -189,7 +189,9 @@ func _on_player_died(victim_peer: int) -> void:
 	_respawning[victim_peer] = true
 	_set_dead.rpc(victim_peer, true)
 	await get_tree().create_timer(GameManager.config.respawn_time).timeout
-	_respawn_player.rpc(victim_peer)
+	# Broadcast the authoritative spawn position so every peer can park the respawning player's
+	# (decoupled) Visual at it — the owner-only body teleport below replicates ~1 RTT later.
+	_respawn_player.rpc(victim_peer, player_spawn_position.global_position)
 	_respawning.erase(victim_peer)
 
 
@@ -201,7 +203,7 @@ func _set_dead(victim_peer: int, dead: bool) -> void:
 
 
 @rpc("authority", "call_local", "reliable")
-func _respawn_player(victim_peer: int) -> void:
+func _respawn_player(victim_peer: int, spawn_pos: Vector3) -> void:
 	var player := get_node_or_null(str(victim_peer)) as Player
 	if player == null:
 		return
@@ -209,7 +211,9 @@ func _respawn_player(victim_peer: int) -> void:
 	if hc:
 		hc.reset()
 	player.set_dead(false)
+	# Park the decoupled remote Visual at the spawn point on every peer (no-op on the owner).
+	player.respawn_visual_to(spawn_pos)
 	# The victim's own machine teleports its own player (robust to authority config).
 	if multiplayer.get_unique_id() == victim_peer:
-		player.global_position = player_spawn_position.global_position
+		player.global_position = spawn_pos
 		player.velocity = Vector3.ZERO
