@@ -7,6 +7,27 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ---
 
+## 2026-06-09 (remote-player movement smoothing)
+
+*No more sea-sick jitter watching a teammate run*
+
+### 🛡️ Stability & Netcode
+
+- **Remote players glide instead of stuttering.** A teammate's position replicates in snapshots that
+  Godot applies with no interpolation, so on your screen they teleported between packets — fine
+  standing/aiming, sea-sick when they ran. Now, on remote copies only, the visible model is decoupled
+  and **eased toward the synced position + facing each frame** (frame-rate independent, snaps on
+  respawn/teleport). The body stays authoritative — collision and host hit-resolution use the true
+  position; only the cosmetic visual lags (~0.3 m at run speed, tunable via `remote_smoothing_rate`).
+  Enemies are unchanged for now (their slow, distant motion hides the same stutter — a deferred
+  follow-up). (#55)
+- **Why the simple fix.** Chose the community-standard "lerp the visual toward the synced value" over
+  a hand-rolled snapshot-interpolation buffer (over-engineered for co-op PvE) and over adopting netfox
+  (same one-tick result for *just* smoothing, but a structural migration). netfox / lag-compensation /
+  NAT-relay stay a separate, deliberate "adopt a foundation" decision for later.
+
+---
+
 ## 2026-06-07 (cast timing + FP/TP split)
 
 *Instant in first-person, gesture-timed for everyone else*

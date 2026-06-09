@@ -118,8 +118,15 @@ Godot 4 `MultiplayerSynchronizer` replication modes used here:
 - **Mode 2** (`REPLICATION_MODE_ON_CHANGE`) — syncs only when value changes. Used for the
   synced input fields in `PlayerInputSynchronizerComponent`.
 
-*If* you add velocity sync (a Beyond-the-slice item in `DESIGN.md`), use mode 1 alongside
-`global_position` for smoother client interpolation.
+**Remote-body visual smoothing.** `global_position` (mode 1) is applied with **no interpolation** —
+Godot snaps it, so a remote body teleports between snapshots. On **remote (non-authority) player
+copies** the visible `Visual` is therefore **decoupled** (`top_level = true`, set in code) and its
+position + facing are **eased toward** the replicated body each frame (`remote_smoothing_rate`,
+frame-rate-independent `1 - exp(-rate*delta)`, with a snap-guard for respawn/teleport). The **body
+stays snapped** (collision + host hit-resolution use the true position); only the cosmetic Visual
+lags; the **owner's Visual is untouched** (its staff-muzzle world read must stay exact). This is the
+community-standard "lerp the visual toward the synced value" fix — a deeper snapshot buffer / netfox /
+velocity sync (a Beyond-the-slice item in `DESIGN.md`) was considered and deferred.
 
 ### SceneReplicationConfig NodePath Syntax
 
@@ -290,10 +297,13 @@ entities/
     player.gd                 — First-person CharacterBody3D controller: run / jump / look / cast /
                                 death-state (velocity + move_and_slide + is_on_floor). Authors
                                 replicated `aim_yaw` + `anim_speed` and feeds the Visual's animator
-                                each frame. Climbing/parkour removed.
+                                each frame. On REMOTE copies, decouples the Visual (top_level) and eases
+                                it toward the synced body position/facing (`remote_smoothing_rate`) so
+                                teammates glide, not stutter. Climbing/parkour removed.
     player.tscn               — FP body, InputSync, MultiplayerSynchronizer, HealthComponent,
-                                HitFlashComponent, a `Visual` instance of player_visual.tscn,
-                                capsule collider, NameLabel, camera. (WandComponent is added in code.)
+                                HitFlashComponent, a `Visual` instance of player_visual.tscn (with
+                                NameLabel parented under it so it rides the smoothed transform),
+                                capsule collider, camera. (WandComponent is added in code.)
     player_visual.tscn        — The visible rig: KayKit Mage (.glb) + an AnimationTree (BlendTree:
                                 idle↔run BlendSpace1D + a OneShot cast) + LocomotionAnimator. BUILT.
   projectiles/                — projectile.gd/.tscn: host-spawned + host-resolved spell projectile
@@ -527,6 +537,12 @@ two hand-rolled `grab_focus` workarounds failed before a doc check found the one
   and the airborne wall-stick is gone (move_and_slide slides along walls). Movement is velocity-model
   in `player.gd._physics_process` (gravity + jump on Y, `move_toward` accel/decel on the horizontal).
   Emergent rigid-body shoving is gone by design — knockback/ragdoll are now scripted (a follow-up).
+- **Remote bodies snap; their *Visual* is what's smoothed.** A remote player's `global_position`
+  replicates with no interpolation (Godot snaps mode-1 values), so the **body** teleports between
+  packets *by design* — collision and host hit-resolution must use that true position. The visible
+  stutter is hidden by easing the decoupled `Visual` toward it (see Replication Modes). **Don't "fix"
+  the body snap by lerping the body** — that would desync collision/hits. Smooth the Visual, not the
+  body. (Players done; remote enemies are a deferred follow-up.)
 - **Cast feel is host-asymmetric.** The host feels instant casts; clients eat a round-trip. The
   local cosmetic muzzle flash masks it; read playtests knowing host feel ≠ client feel (rotate hosts).
 - **Damage-value timing is host-asymmetric (distinct from cast feel above — that's latency, this is

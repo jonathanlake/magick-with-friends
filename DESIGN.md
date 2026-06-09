@@ -152,7 +152,11 @@ Beyond the slice (only if it proves fun):
 - **Run / meta structure** beyond wave-survival.
 - **Production HUD** (health/shield, current spell, wave/timer).
 - **Spawn point system** (4–8 points, by player index).
-- **Velocity sync** for smoother client interpolation.
+- **Remote-movement smoothing — partly done.** Remote *players* now glide via a client-side visual
+  lerp toward the synced position (PR #55, the community-standard fix). Still open: the same smoothing
+  on **remote enemies** (deferred — their slow/distant motion hides the stutter for now), and the
+  deeper **velocity-sync / extrapolation** option (replicate velocity, not just position) only if the
+  simple lerp proves insufficient over real latency.
 - **More Forms/Elements**, modifiers (constrained), downed/revive.
 
 ---
@@ -167,6 +171,13 @@ Beyond the slice (only if it proves fun):
 - **Steam networking** — replace the ENet peer with `SteamMultiplayerPeer`; keep all
   spawn/RPC logic identical (the point of `NetworkManager`).
 - **Cloudflare Workers / WebSocket relay** — online play without port forwarding.
+- **netfox (or equivalent) as a networking foundation.** Evaluated when fixing remote-movement jitter
+  (PR #55) and deliberately deferred: its rollback/prediction core is overkill for host-authoritative
+  co-op, and its smoothing piece (`TickInterpolator`) is no better than the simple visual lerp we
+  shipped. Revisit as **one** decision if/when we want **lag compensation** (server-rewind for precise
+  PvP hits), **client-side prediction** (snappier remote feel), or **`netfox.noray`** for NAT
+  punch-through / relay (the "play without port forwarding" need — overlaps the relay bullet above).
+  Adopt the foundation on its own merits, not to patch a symptom.
 - **Lobby / ready system**, **spectator camera** for dead players, **gamepad** bindings +
   right-stick look.
 - **Multiplayer sandbox / swappable mini-game levels.** The longer-term broadening introduced in
