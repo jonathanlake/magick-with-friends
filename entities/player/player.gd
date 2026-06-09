@@ -12,6 +12,13 @@ extends CharacterBody3D
 @export var fall_gravity_multiplier: float = 3.0   # extra gravity while falling (weightier landing)
 @export var camera_height: float = 0.75
 @export var camera_smoothing: float = 15.0
+# Per-second rate a REMOTE player's visual eases toward its networked position (frame-rate
+# independent: weight = 1 - exp(-rate*delta)). The body's global_position arrives in held, snapped
+# network packets (mode 1, no interpolation); we glide the decoupled Visual toward it instead of
+# teleporting. The visual trails true position by ~speed/rate (~0.33 m at 6 u/s, rate 18). Higher =
+# snappier (less trail, more residual jitter); lower = floatier. Owner copies are NOT smoothed (their
+# Visual must stay exact for the staff-muzzle world read).
+@export var remote_smoothing_rate: float = 18.0
 @export var mouse_sensitivity: float = 0.003
 # Casts spawn at the staff muzzle but aim toward a point this far down the camera ray, so the shot
 # converges on the crosshair instead of flying parallel to it (offset by the muzzle's position).
@@ -56,7 +63,7 @@ var anim_speed: float = 0.0
 @onready var _input_sync: PlayerInputSynchronizerComponent = $PlayerInputSynchronizerComponent
 @onready var _camera_rig: Node3D = $CameraRig
 @onready var _camera: Camera3D = $CameraRig/Camera3D
-@onready var _name_label: Label3D = $NameLabel
+@onready var _name_label: Label3D = $Visual/NameLabel
 # The visible body — an instance of player_visual.tscn (the model + animations). Hidden for the
 # local first-person player; shown for remote copies so teammates see this player's body. Also
 # rotated by aim_yaw so the model faces the look direction.
@@ -99,6 +106,12 @@ func _ready() -> void:
 
 	if not is_multiplayer_authority():
 		_camera.current = false
+		# Decouple the Visual from the snapped body transform so we can glide it toward the networked
+		# position (the synchronizer teleports the body between packets). top_level only on remote
+		# copies; the owner keeps the Visual parented + exact. Seed onto the body so it doesn't glide
+		# in from the origin on spawn.
+		_visual.top_level = true
+		_visual.global_position = global_position
 		return
 
 	_camera.current = true
@@ -137,11 +150,17 @@ func _input(event: InputEvent) -> void:
 
 func _process(delta: float) -> void:
 	if not is_multiplayer_authority():
-		# Remote copy: orient the visible model to the replicated look-yaw (body is angular-locked),
-		# feed it the replicated speed (steady value -> no remote blend jitter), and the replicated
-		# look-pitch so the upper body tilts to where this player is aiming.
+		# Remote copy: glide the decoupled Visual toward the snapped body position + facing (mode-1
+		# packets have no interpolation, so raw assignment teleports). Frame-rate-independent weight;
+		# snap on a large jump (respawn/teleport) so the body doesn't slide across the arena. Feed the
+		# replicated speed/pitch as before (steady drivers -> no remote blend jitter).
 		if _visual:
-			_visual.rotation.y = aim_yaw
+			var w := 1.0 - exp(-remote_smoothing_rate * delta)
+			if _visual.global_position.distance_to(global_position) > 3.0:
+				_visual.global_position = global_position
+			else:
+				_visual.global_position = _visual.global_position.lerp(global_position, w)
+			_visual.rotation.y = lerp_angle(_visual.rotation.y, aim_yaw, w)
 			if _visual.has_method("feed_speed"):
 				_visual.feed_speed(anim_speed)
 			if _visual.has_method("feed_pitch"):
