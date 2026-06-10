@@ -2,7 +2,8 @@
 
 Architecture reference for AI-assisted development. Read this before touching any file.
 
-**Game vision, design decisions, build roadmap, and status live in `DESIGN.md`.** DESIGN is
+**Vision, design decisions, build roadmap, and status live in `DESIGN.md`** (framework-scoped;
+the fixture game's frozen design decisions live with the game, `games/magick/DESIGN.md`). DESIGN is
 **decision-led** (what/why); this file is **structure-led** (how the code is organized): rules,
 architecture, file map. Expect some overlap — when a fact is in both, the *decision* lives in
 `DESIGN.md` and the *implementation detail* lives here. The **workflow-led** day-to-day
@@ -10,9 +11,9 @@ mechanics — two-window DEBUG setup, the pre-PR headless validation gate, and t
 gotcha list — live in `docs/DEV.md`; **open it before running the project, validating a PR, or
 touching player movement / replication / damage / collision.** Two **reference-led** docs trace
 specific systems end-to-end with real function names: `docs/NETWORKING.md` (transport,
-authority, replication, RPCs, lifecycles, edge cases) and `docs/SPELLS.md` (the blend system,
-class-by-class). Reach for those to answer "what happens when X?"; reach for this file for
-rules and structure.
+authority, replication, RPCs, lifecycles, edge cases) and `games/magick/SPELLS.md` (the blend
+system, class-by-class). Reach for those to answer "what happens when X?"; reach for this file
+for rules and structure.
 
 In one line: a **reusable host-client co-op multiplayer framework** for Godot (the
 "friendslop framework" — 2–8 players, friend groups) plus its **test fixture**: a 3D
@@ -44,7 +45,7 @@ tiebreaker. The roadmap is framework milestones (`DESIGN.md`), led by real-onlin
   been pushed to remote, and a list of files changed.
 - **Keep the reference docs true.** A PR that changes networking behavior updates
   `docs/NETWORKING.md` in the same PR; one that changes spell behavior updates
-  `docs/SPELLS.md`. Code is truth — a doc/code mismatch is a doc bug.
+  `games/magick/SPELLS.md`. Code is truth — a doc/code mismatch is a doc bug.
 
 ---
 
@@ -255,12 +256,12 @@ Players and enemies use KayKit models (gitignored `/assets/`) animated through o
 ### Spell System — BLEND (fixture combat core — frozen as a game)
 
 A spell fuses two swappable slots **on cast** → **one fused effect** (NOT a sequence/program;
-see `DESIGN.md` for the blend rationale and the legibility north star). The class-by-class
-reference — every property, the cast pipeline, hit/reaction resolution, how to add content —
-is `docs/SPELLS.md`:
+see `games/magick/DESIGN.md` for the blend rationale and the legibility north star). The
+class-by-class reference — every property, the cast pipeline, hit/reaction resolution, how to
+add content — is `games/magick/SPELLS.md`:
 
 - **Form** — delivery shape, where the mechanical distinctness lives (the ~7-Form ceiling + the
-  candidate list is a *decision* — see `DESIGN.md`). *Slice:* Projectile, AoE burst.
+  candidate list is a *decision* — see `games/magick/DESIGN.md`). *Slice:* Projectile, AoE burst.
 - **Element** — thin damage + reaction layer, via a small reaction table. *Slice:* Fire, Lightning.
 - **Modifier** — optional; Split / Bounce / Homing **omitted in the slice** (they erode the
   per-cast legibility blend exists to protect).
@@ -268,8 +269,8 @@ is `docs/SPELLS.md`:
 Implemented as `@export`-driven Resources under `games/magick/spells/` (`Spell` / `SpellForm` /
 `SpellElement` / `BlendSpell`), cast by a `WandComponent` on the player holding the
 `(Form, Element)` pair and enforcing `cast_delay_sec`. `Spell` exposes a `cast_on_host()` seam so
-an authored `CascadeSpell` (a deferred cascade experiment — cut from the slice, see `DESIGN.md`)
-could slot in without reworking the wand.
+an authored `CascadeSpell` (a deferred cascade experiment — cut from the slice, see
+`games/magick/DESIGN.md`) could slot in without reworking the wand.
 
 **Host-authoritative** (see Multiplayer Model): casts originate on the authority peer; the host
 spawns + resolves them (damage incl. friendly fire, reactions) and replicates out. **Reactions**
@@ -277,7 +278,7 @@ are two cheap layers (NOT a pixel sim): entity status (lightning chains to nearb
 allies; fire burns + spreads — built) and `Area3D` world volumes (oil, water — never built,
 **frozen** with the fixture). **Acquisition** (keep-or-swap pickups) was **cut by the framework
 reframe** — the dev-console `give [all]` stand-in remains. Frozen design rationale lives in
-`DESIGN.md` → the Fixture section.
+`games/magick/DESIGN.md`.
 
 ---
 
@@ -339,6 +340,11 @@ framework/                    ══ THE SPINE (game-agnostic; the future addon/
                                 client-side commands. BUILT.
 
 games/magick/                 ══ THE FIXTURE (frozen as a game; exercises the spine) ══
+  DESIGN.md                   — Game-decision-led: the fixture's frozen design decisions
+                                (vision, BLEND rationale, legibility north star, frozen ideas).
+                                Travels with the game if it ever graduates to its own repo.
+  SPELLS.md                   — Reference-led: the BLEND system class-by-class — every @export,
+                                the cast pipeline, hit + reaction resolution, how to add content.
   spell_catalog.gd            — Autoload (game-owned). Index-stable Form/Element arrays +
                                 `make_blend(f,e)` so every peer builds the SAME spell from
                                 replicated indices. BUILT.
@@ -379,8 +385,6 @@ docs/
                                 transport seam, authority tables, every replicated property,
                                 the full RPC catalog, lifecycles, the edge-case matrix, and the
                                 reusing-the-spine checklist.
-  SPELLS.md                   — Reference-led: the BLEND system class-by-class — every @export,
-                                the cast pipeline, hit + reaction resolution, how to add content.
   IDEAS.md                    — The game-idea backlog (capture > debate). Three lines per idea
                                 (the clip / the loop / framework demands) + SEED→GRAY-BOXED→
                                 PROMOTED/SHELVED statuses. Intake for DESIGN.md's cadence guard.

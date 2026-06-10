@@ -287,8 +287,8 @@ test fixture. This section is the map of what carries to the next game.)
 - The menu's connect/host flow incl. all §9 failure handling.
 
 **Game-specific (replace per game):** the player controller, the spell system
-(`games/magick/spells/`, see `docs/SPELLS.md`), `Reactions`, `WaveDirector`, enemy AI, the level
-scene, the HUD.
+(`games/magick/spells/`, see `games/magick/SPELLS.md`), `Reactions`, `WaveDirector`, enemy AI,
+the level scene, the HUD.
 
 **Standing up a new game on the spine — checklist:**
 

@@ -9,7 +9,7 @@ name those systems for a reason).
 
 - **Rules, architecture, file map** → `CLAUDE.md` (always read first).
 - **Decisions / roadmap** → `DESIGN.md`.
-- **System traces** → `docs/NETWORKING.md` (multiplayer) / `docs/SPELLS.md` (blend system).
+- **System traces** → `docs/NETWORKING.md` (multiplayer) / `games/magick/SPELLS.md` (blend system).
 
 ---
 
