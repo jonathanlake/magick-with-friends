@@ -5,8 +5,8 @@ with real function names, so you can answer "what happens when X?" without readi
 It documents behavior; it does not own decisions or rules:
 
 - **Why** it works this way (the authority decision, the friend-co-op trust model) → `DESIGN.md`.
-- **Rules, gotchas, and dev workflow** (the `".:prop"` path rule, authority timing, headless
-  validation) → `CLAUDE.md`.
+- **Rules and architecture** (the `".:prop"` path rule, authority timing) → `CLAUDE.md`.
+- **Dev workflow, headless validation, and the gotcha list** → `docs/DEV.md`.
 - **When you change networking behavior, update this doc in the same PR** (CLAUDE.md workflow
   rule). Code is truth; if this doc and the code disagree, the code wins and this doc has a bug.
 
@@ -115,7 +115,7 @@ teleports between packets *by design* (collision and host hit-resolution need th
 position). On remote player copies the visible `Visual` is decoupled (`top_level = true`) and
 eased toward the body by `RemoteVisualSmoother` (`1 - exp(-rate·delta)` weight, snap guard at
 5 m, respawn park). **Never lerp the body itself** — smooth the Visual. Full rationale:
-`CLAUDE.md` → Replication Modes / Known Issues.
+`CLAUDE.md` → Replication Modes; `docs/DEV.md` → Known Issues.
 
 **Health is never replicated by a synchronizer.** It flows host → all via the `_sync_health`
 reliable RPC (value-sync), because synchronizer-replicated health can desync. See §8.

@@ -3,13 +3,16 @@
 Architecture reference for AI-assisted development. Read this before touching any file.
 
 **Game vision, design decisions, build roadmap, and status live in `DESIGN.md`.** DESIGN is
-**decision-led** (what/why); this file is **structure-led** (how the code is organized + the
-dev workflow): rules, file map, the non-obvious Godot gotchas. Expect some overlap — when a fact
-is in both, the *decision* lives in `DESIGN.md` and the *implementation detail* lives here.
-Two **reference-led** docs trace specific systems end-to-end with real function names:
-`docs/NETWORKING.md` (transport, authority, replication, RPCs, lifecycles, edge cases) and
-`docs/SPELLS.md` (the blend system, class-by-class). Reach for those to answer "what happens
-when X?"; reach for this file for rules and gotchas.
+**decision-led** (what/why); this file is **structure-led** (how the code is organized): rules,
+architecture, file map. Expect some overlap — when a fact is in both, the *decision* lives in
+`DESIGN.md` and the *implementation detail* lives here. The **workflow-led** day-to-day
+mechanics — two-window DEBUG setup, the pre-PR headless validation gate, and the Known Issues
+gotcha list — live in `docs/DEV.md`; **open it before running the project, validating a PR, or
+touching player movement / replication / damage / collision.** Two **reference-led** docs trace
+specific systems end-to-end with real function names: `docs/NETWORKING.md` (transport,
+authority, replication, RPCs, lifecycles, edge cases) and `docs/SPELLS.md` (the blend system,
+class-by-class). Reach for those to answer "what happens when X?"; reach for this file for
+rules and structure.
 
 In one line: a **reusable host-client co-op multiplayer framework** for Godot (the
 "friendslop framework" — 2–8 players, friend groups) plus its **test fixture**: a 3D
@@ -34,8 +37,9 @@ tiebreaker. The roadmap is framework milestones (`DESIGN.md`), led by real-onlin
   from the actual current state of main. Skipping this causes merge conflicts on every PR.
 - **Open a PR when done.** Every task ends with a pull request against main.
 - **One feature per PR.** Keep PRs narrowly scoped and independently reviewable/playable.
-- **Validate before every code PR.** Run the headless check (see "Headless Validation"
-  below); do not open the PR if it reports parse/scene errors.
+- **Validate before every code PR.** Run `bash tools/validate.sh` (Git Bash; also exposed as
+  the `/validate` skill) — the three-check headless gate, detailed in `docs/DEV.md`. Do not
+  open the PR if it fails.
 - **End-of-task confirmation.** After pushing, always report: branch name, whether it's
   been pushed to remote, and a list of files changed.
 - **Keep the reference docs true.** A PR that changes networking behavior updates
@@ -367,6 +371,10 @@ games/magick/                 ══ THE FIXTURE (frozen as a game; exercises th
   levels/test_level.tscn      — Walled horde arena (CSG floor + 4 perimeter walls).
 
 docs/
+  DEV.md                      — Workflow-led: two-window DEBUG setup, the headless validation
+                                gate (three checks, false positives), and the Known Issues /
+                                gotcha list. Read before running, validating, or touching
+                                movement/replication/damage/collision.
   NETWORKING.md               — Reference-led: the multiplayer spine traced end-to-end —
                                 transport seam, authority tables, every replicated property,
                                 the full RPC catalog, lifecycles, the edge-case matrix, and the
@@ -378,7 +386,13 @@ docs/
                                 PROMOTED/SHELVED statuses. Intake for DESIGN.md's cadence guard.
 
 tools/
-  smoke-test.sh               — Headless gameplay smoke test (see Headless Validation).
+  validate.sh                 — Pre-PR gate: runs all three headless checks (docs/DEV.md).
+                                Also exposed as the /validate skill.
+  smoke-test.sh               — Headless gameplay smoke test — check 3 of the gate; called
+                                by validate.sh, runnable alone.
+
+.claude/skills/
+  validate/SKILL.md           — /validate skill: runs tools/validate.sh + how to read failures.
 
 main.gd                       — MIXED composition root (spine spawner/peer_ready/damage skeleton
                                 + fixture spawn_functions/forwarders). Splitting it per-game is a
@@ -409,90 +423,34 @@ spine-vs-fixture split is mapped in `docs/NETWORKING.md` §10):
 - [x] **IP input field** + name validation in the main menu (falls back to `127.0.0.1:3000`)
 - [x] Floating name labels over players; KayKit Mage/Skeleton models with idle/run + attack animation
       (placeholder capsules retired)
-- [x] **DEBUG autoload** — disabled-by-default two-window autostart (see below)
+- [x] **DEBUG autoload** — disabled-by-default two-window autostart (see `docs/DEV.md`)
 - [x] Two-player local multiplayer verified — host + client see each other move (first-person)
 - [x] **Blend casting + friendly fire + death/respawn** — built and validated two-window
 
 > **Online status:** only **same-machine two-window** is verified on this codebase. Per-peer
-> authority *does* propagate correctly (repro in Known Issues); the open gap is **cross-machine
+> authority *does* propagate correctly (repro in `docs/DEV.md` → Known Issues); the open gap is **cross-machine
 > transport** (NAT / relay / latency), not an authority fix. Full story + the test plan:
 > **framework milestone 1** (`DESIGN.md` roadmap — real-online verification, canonical).
 
 ---
 
-## DEBUG Autoload — Dev Workflow
+## Dev Workflow, Validation & Gotchas — `docs/DEV.md`
 
-`framework/debug/debug.gd` is registered as the `DEBUG` autoload in `project.godot` **without** the `*`
-prefix, so it is **disabled by default**. It never runs in normal play or exported builds.
+The day-to-day mechanics were split into `docs/DEV.md` (workflow-led, loaded on demand):
 
-### Enabling for local two-window testing
+- **Two-window DEBUG setup** — enabling the DEBUG autoload + Run Instances arguments.
+- **Headless validation** — the three-check pre-PR gate (parse / import / boot smoke), incl.
+  how to read each check's false positives. One command runs it all: `bash tools/validate.sh`
+  (Git Bash), also exposed as the `/validate` skill.
+- **Known Issues / Watch Out For** — the hard-won gotcha list. **Read it before touching
+  player movement, replication/smoothing, damage flow, collision layers, or `@export` node
+  wiring** — every entry exists because something silently broke.
 
-1. **Enable the autoload** — Project Settings → Autoload → check `DEBUG` (or add `*` before
-   `res://framework/debug/debug.gd` in `project.godot`).
-2. **Configure Run Instances** — Debug → Customize Run Instances, two instances:
+Two rules from that doc that must hold in **every** commit:
 
-   | Instance | Arguments |
-   |----------|-----------|
-   | 1 (Host) | `-- host debug_autostart` |
-   | 2 (Client) | `-- join debug_autostart` |
-
-   The `--` separator is required — everything after it is read via `OS.get_cmdline_user_args()`.
-   Role keywords accept aliases: `host`/`server` and `join`/`client` are interchangeable.
-3. **Hit Play (F5).** Both windows launch. Host titles itself `HOST`, client `CLIENT`. The host
-   opens on the leftmost monitor, the client on the primary monitor (single-screen = side-by-side).
-
-### Disabling before shipping / returning to normal play
-
-| Step | Enabled | Disabled |
-|------|---------|----------|
-| `project.godot` DEBUG line | `DEBUG="*res://framework/debug/debug.gd"` | `DEBUG="res://framework/debug/debug.gd"` |
-| Run Instances Launch Arguments | `-- host/join debug_autostart` | **cleared** |
-
-**Important:** Godot passes Launch Arguments even when "Override Main Run Args" is unchecked.
-**Clear the Launch Arguments**, not just the autoload. Both steps are required.
-
-**Rule:** Never commit `project.godot` with `DEBUG="*res://framework/debug/debug.gd"`. The `*` is dev-local only.
-
----
-
-## Headless Validation (run before every code PR)
-
-Godot 4.6 lives at
-`C:\Users\Jon\Documents\Game Development\Engines\Godot 4.6\Godot_v4.6-stable_win64.exe`
-— **local-specific** (machine/version-locked; override via `GODOT=…`, update on a version bump).
-
-Before opening **any code PR**, validate headlessly and **do not open the PR if it reports
-parse/scene errors**. `.godot/` is gitignored, so runs don't dirty the tree. **Three** checks —
-no single one is complete (verified empirically):
-
-1. **Parse-check each changed `.gd`** — catches syntax errors in **any** script, incl. brand-new
-   files (which check 2 misses):
-   ```
-   "<godot>" --headless --path "<project>" --check-only --script "res://path/to/changed.gd"
-   ```
-   **Fail only on `Parse Error` lines.** `--check-only` doesn't load autoloads, so it *falsely*
-   reports `Identifier not found: GameManager / NetworkManager / …` for any script using an
-   autoload — **ignore those**.
-2. **Import-check the project** — catches broken `.tscn`/resource refs and errors in **modified
-   existing** scripts (it reloads changed files with autoloads). Does **not** reliably parse
-   brand-new files in one run (that's check 1).
-   ```
-   "<godot>" --headless --editor --quit --path "<project>"
-   ```
-   **Fail on `SCRIPT ERROR` / `Parse Error` / `Failed to load`.**
-3. **Gameplay boot smoke test** — confirms the project not only *loads* but *runs*: boots a
-   headless **host** into the game (`Main`, host player spawned) and fails on any runtime error.
-   Catches `_ready` / spawn / boot errors the load-checks miss, plus host-driven systems that
-   run without input (e.g. the enemy/wave director).
-   ```
-   bash tools/smoke-test.sh
-   ```
-   Prints `SMOKE: PASS` / `FAIL` (exit 0/1; run it from **Git Bash**, bundled with Git for Windows).
-   **Host-driven only** — it does not exercise input (casting/movement); that stays with the
-   two-window playtest.
-
-Together these catch the "won't parse / won't load / won't boot" bugs a no-Godot session would
-ship blind. They are the cheap gate **before** the two-window playtest — not a replacement.
+- **Never commit `project.godot` with `DEBUG="*res://framework/debug/debug.gd"`** — the `*`
+  (enabled DEBUG autoload) is dev-local only.
+- **Never open a code PR that fails the validation gate.**
 
 ---
 
@@ -559,60 +517,3 @@ add more complexity.** (Concrete example: the dev-console input "losing focus" a
 focus bug at all — Godot 4.4 added `LineEdit.keep_editing_on_text_submit` defaulting to `false`;
 two hand-rolled `grab_focus` workarounds failed before a doc check found the one-property fix.)
 
----
-
-## Known Issues / Watch Out For
-
-- **Player controller is `CharacterBody3D` (first-person).** Switched from RigidBody3D — crisper feel,
-  and the airborne wall-stick is gone (move_and_slide slides along walls). Movement is velocity-model
-  in `player.gd._physics_process` (gravity + jump on Y, `move_toward` accel/decel on the horizontal).
-  Emergent rigid-body shoving is gone by design — knockback/ragdoll are now scripted (a follow-up).
-- **Remote bodies snap; their *Visual* is what's smoothed.** A remote player's `global_position`
-  replicates with no interpolation (Godot snaps mode-1 values), so the **body** teleports between
-  packets *by design* — collision and host hit-resolution must use that true position. The visible
-  stutter is hidden by easing the decoupled `Visual` toward it (see Replication Modes). **Don't "fix"
-  the body snap by lerping the body** — that would desync collision/hits. Smooth the Visual, not the
-  body. (Players done; remote enemies are a deferred follow-up.)
-- **Cast feel is host-asymmetric.** The host feels instant casts; clients eat a round-trip. The
-  local cosmetic muzzle flash masks it; read playtests knowing host feel ≠ client feel (rotate hosts).
-- **Damage-value timing is host-asymmetric (distinct from cast feel above — that's latency, this is
-  value timing).** `apply_player_damage` on the host pre-applies `hc.damage()` *before* it sends
-  `_sync_health.rpc(...)`, so by the time the synced value lands the host's `current_health` is
-  already the new (lower) value while clients still hold the old one. **Never gate a local cue on
-  `value < current_health`** — it's false on the host and the cue silently no-ops there (exactly the
-  bug behind "self-damage flash worked on clients but not the host"). Emit on the fact that a damage
-  sync arrived, not on a before/after compare.
-- **Typed-node `@export` resolves to `null` from a hand-authored `.tscn`.** A `@export var x:
-  MeshInstance3D` (or any node type) only gets wired when set via the editor's node-picker; a
-  NodePath typed into the `.tscn` by hand stays unresolved and the var reads `null` at runtime — no
-  error, just a silently dead reference. Use `@export var x_path: NodePath` + `get_node_or_null(x_path)`
-  in `_ready()` instead (how `HitFlashComponent` wires its mesh/health). The headless gate can't catch
-  this — verify node wiring with a targeted probe.
-- **Spawn height vs capsule:** keep spawn markers at `y≈1.0`+ so the capsule doesn't clip the floor.
-- **Collision layers (named + explicit).** Four named layers in `project.godot`, mapping *slot →
-  bit value*: `world` = slot 1 (bit 1), `players` = slot 2 (bit 2), `enemies` = slot 3 (bit 4),
-  `projectiles` = slot 4 (bit 8). **Every `collision_layer`/`collision_mask` number below is a raw
-  bit int** (what's stored in the `.tscn`, = `2^(slot-1)`), *not* a slot number — so `enemies` is
-  `collision_layer = 4`, not 3. Assignments:
-  - **world** (CSG floor + walls): `collision_layer = 1`, `collision_mask = 0` (static; bodies collide
-    *into* it via their masks).
-  - **player** (`player.tscn` CharacterBody3D): `collision_layer = 2`, `collision_mask = 7`
-    (world+players+enemies — players + enemies block each other; grounded via `is_on_floor()`, no
-    separate GroundCheck ray).
-  - **enemy** (`enemy_base.tscn` CharacterBody3D): `collision_layer = 4`, `collision_mask = 7`
-    (world+players+enemies — enemies collide with the arena, players, and each other so they don't stack).
-  - **projectile** (`projectile.tscn` Area3D): `collision_layer = 8`, `collision_mask = 6`
-    (players+enemies — friendly fire ON, hits both, **ignores world**). It despawns on
-    Player/HealthComponent hits + lifetime, so walls don't stop a single-target bolt. **Bursts
-    flip their mask to 7 at runtime** (`projectile.gd:setup`) so they detonate on floors/walls.
-- **`input_multiplayer_authority` propagation (verified OK — not a bug).** Earlier notes calling
-  this "host-only / broken cross-machine" were a misdiagnosis; it propagates correctly. **Repro:**
-  enable the DEBUG autoload + run two-window — the `[AUTH]` line in `player.gd` prints each copy's
-  authority from every peer's view (a client sees the host's player as `authority=1 is_mine=false`,
-  its own as `is_mine=true`). *Why it works* and the still-untested cross-machine transport piece:
-  framework milestone 1 (`DESIGN.md` roadmap — real-online verification, canonical — don't
-  restate it here).
-- `main_menu.gd` defaults to `127.0.0.1` and port `3000` (keep the port an `int` — ENet requires it).
-- `multiplayer.connected_to_server` is only wired for the client path; the host transitions
-  immediately — correct, don't add host-side handling.
-- `class_name Player` must stay — `main.gd`'s `spawn_function` casts to `Player`.

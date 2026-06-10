@@ -6,3 +6,6 @@
 # Code loads these at runtime if present and falls back to placeholder meshes if absent,
 # so the repo still builds/runs without them. See components/character_visual.gd.
 /assets/
+
+# Claude Code local permission grants (machine-local; skills/ IS committed)
+.claude/settings.local.json
