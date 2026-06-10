@@ -184,9 +184,9 @@ sequenceDiagram
     participant All as Every peer
     participant H as Host
     O->>O: LMB → wand.begin_cast()  (cooldown taken AT INPUT — no spam during wind-up)
-    O->>All: play_cast_anim.rpc()  (gesture + SFX; caster's own Visual is hidden)
+    O->>All: play_cast_anim.rpc()  (gesture + SFX — caster's own Visual is hidden)
     O->>O: fire_fp_cast(): muzzle-flash light + SpellTracer through the crosshair (INSTANT, local)
-    Note over O: …gesture plays; at its RELEASE frame the Visual emits oneshot_released (code timer)
+    Note over O: …gesture plays — at its RELEASE frame the Visual emits oneshot_released (code timer)
     O->>O: _on_cast_released(): origin = staff muzzle (BoneAttachment3D), aim = crosshair raycast point
     alt owner IS the host
         O->>H: wand.fire_cast() → BlendSpell.cast_on_host() directly
