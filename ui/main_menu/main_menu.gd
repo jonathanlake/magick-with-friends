@@ -35,7 +35,13 @@ func _on_name_changed(new_text: String) -> void:
 
 func _on_host_pressed() -> void:
 	GameManager.player_name = name_input.text.strip_edges()
-	NetworkManager.host_game()
+	var port := _parse_port(ip_input.text.strip_edges())
+	# host_game fails synchronously when the port is already bound (e.g. a second host on this
+	# machine). Stay on the menu and say so — changing scene anyway used to boot a phantom
+	# offline "host" session nobody could join, with no error shown.
+	if NetworkManager.host_game(port) != OK:
+		status_label.text = "Could not host on port %d (already in use?)." % port
+		return
 	get_tree().change_scene_to_packed(main_scene)
 
 
@@ -46,12 +52,9 @@ func _on_join_pressed() -> void:
 		address = "127.0.0.1"
 
 	var ip := address
-	var port := NetworkManager.DEFAULT_PORT
 	if ":" in address:
-		var parts := address.split(":", false, 1)
-		ip = parts[0]
-		if parts.size() > 1 and parts[1].is_valid_int():
-			port = parts[1].to_int()
+		ip = address.split(":", false, 1)[0]
+	var port := _parse_port(address)
 
 	host_button.disabled = true
 	join_button.disabled = true
@@ -81,6 +84,17 @@ func _on_connection_failed() -> void:
 	if not _connecting:
 		return  # already handled by the timeout fallback
 	_fail_connection("Could not connect to a host.")
+
+
+# The address field is "ip[:port]". The optional port applies to BOTH join and host (host
+# ignores the ip half — it always binds locally), so same-machine multi-session testing can
+# pick distinct ports. Stays an int — ENet requires it.
+func _parse_port(address: String) -> int:
+	if ":" in address:
+		var parts := address.split(":", false, 1)
+		if parts.size() > 1 and parts[1].is_valid_int():
+			return parts[1].to_int()
+	return NetworkManager.DEFAULT_PORT
 
 
 func _fail_connection(message: String) -> void:

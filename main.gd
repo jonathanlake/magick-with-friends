@@ -98,8 +98,17 @@ func _on_server_disconnected() -> void:
 @rpc("any_peer", "call_remote", "reliable")
 func peer_ready(p_name: String) -> void:
 	var peer_id := multiplayer.get_remote_sender_id()
+	# Duplicate guard: a re-sent peer_ready would spawn a second node Godot auto-renames,
+	# breaking the name-IS-peer-id contract every host lookup below relies on.
+	if get_node_or_null(str(peer_id)) != null:
+		return
 	if multiplayer.get_peers().size() < GameManager.config.max_players:
 		multiplayer_spawner.spawn(_player_spawn_config(peer_id, p_name))
+	else:
+		# Over capacity. The transport already caps clients at max_players - 1, so this is a
+		# backstop — kick, so the peer falls back to its menu (via server_disconnected)
+		# instead of sitting connected-but-playerless in a world it can't play in.
+		NetworkManager.kick_peer(peer_id)
 
 
 ## Host-only. Builds the player spawn config, rolling a random (Form, Element) blend from the
