@@ -46,9 +46,9 @@ it's funnier.
 
 ## Backlog
 
-### Party-games collection — "Friendlympics" (umbrella) · SEED
+### "FIELD DAY" — school-field-day party collection (umbrella) · SEED
 - **The clip:** the medal ceremony after an event where everyone failed.
-- **The loop:** 2–8 friends play short, dumb, physical party events (one swappable level
+- **The loop:** 2–8 friends play short, dumb, school-field-day events (one swappable level
   each); score across an evening; variety IS the product.
 - **Framework demands:** lobby/ready, `selected_level` + host broadcast, the `main.gd`
   per-game split, score/round state — i.e. exactly the queued framework milestones. Each
@@ -56,6 +56,11 @@ it's funnier.
 - **Why this umbrella matters:** no single idea has to be The Idea; "similar games exist"
   dissolves (party collections compete on character, this one stars your friends); shelved
   bigger ideas can donate their best 5 minutes as an event.
+- **Why the school theme earns its place** (renamed from "Friendlympics"): field day isn't
+  just a name — it's a free roster (everything from gym class: sack race, tug-of-war,
+  dodgeball, kickball, capture the flag, egg-and-spoon, water-balloon toss, the rainbow
+  parachute) and a free art direction (cones, whistles, ribbons, juice boxes). The nostalgia
+  does comedic lifting on its own.
 
 ### Three-legged race · SEED (candidate first event)
 - **The clip:** two grown adults faceplanting at the starting line, in sync, twice.
@@ -67,7 +72,20 @@ it's funnier.
   comedy. Scripted ragdoll on fail (the physics-chaos tone, kinematic-safe).
 - Cousins for later events: potato sack (solo rhythm), wheelbarrow (one steers one pumps),
   tug-of-war (team rhythm), egg-and-spoon (move slowly while friends jostle), relay (baton
-  handoff under latency), red-light-green-light (ragdoll pile at the line).
+  handoff under latency), red-light-green-light (ragdoll pile at the line), water-balloon
+  toss (pairs toss-catch over latency, step back each round).
+
+### Red Rover · SEED (FIELD DAY event — shares the player-link module)
+- **The clip:** "RED ROVER RED ROVER, send DAVE on over" yelled into voice chat — then Dave
+  either bounces off the line flat on his back, or blasts through two ragdolling friends.
+- **The loop:** two lines of linked players; the calling team names a runner (out loud — the
+  chant is the ritual); the runner charges a chosen link; the two linked defenders time/mash a
+  grip input on impact — hold and the runner joins your line, break and they take someone home.
+- **Framework demands:** the **player-link constraint** (scripted distance clamp + break
+  threshold between two CharacterBody3Ds — the SAME primitive as the three-legged leg-tie:
+  build the link module once, get both events), charge movement, scripted ragdoll, team/round
+  state. **Voice is baked into the rules** — the call-out is the targeting ritual, the first
+  event where the mic is part of the design rather than the channel.
 
 ### Shipwreck diving — ship crew + divers + walkie-talkies · SHELVED (enthusiasm cooled)
 - **The clip:** a diver's panicked radio call while the deck crew argues about the winch.
