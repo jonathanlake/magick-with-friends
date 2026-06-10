@@ -169,7 +169,11 @@ func _process(delta: float) -> void:
 		return
 
 	var target := global_position + Vector3(0.0, camera_height, 0.0)
-	_camera_rig.global_position = _camera_rig.global_position.lerp(target, camera_smoothing * delta)
+	# Frame-rate-independent ease (same 1 - exp(-rate*delta) form as the remote Visual smoothing).
+	# The old raw camera_smoothing * delta weight exceeded 1.0 below ~15 FPS, overshooting the
+	# target and oscillating the camera exactly when the game was already struggling.
+	_camera_rig.global_position = _camera_rig.global_position.lerp(
+		target, 1.0 - exp(-camera_smoothing * delta))
 	_camera_rig.global_rotation.y = _camera_yaw
 	_camera.rotation.x = _camera_pitch
 
