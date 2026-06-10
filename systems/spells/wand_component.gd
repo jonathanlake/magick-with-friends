@@ -17,6 +17,16 @@ extends Node
 
 @export var equipped_spell: Spell
 @export var cast_delay_sec: float = 0.35
+# Host-gate slack (sec). The owner legitimately takes its cooldown at INPUT, but the host sees a
+# client's casts at RELEASE + latency, so arrival spacing jitters around cast_delay_sec. The host
+# rejects a request only while its copy's cooldown still has MORE than this left — enough slack to
+# absorb network jitter without dropping honest casts, while still capping a modified/spamming
+# client near the real cast rate.
+@export var host_cast_gate_tolerance_sec: float = 0.1
+# Max distance (m) a client-supplied cast origin may sit from its player's body before the host
+# pulls it back. Generous: staff offset (~1 m) + replication lag at full sprint fit well inside
+# it; only a forged "cast from across the map" origin trips it.
+@export var max_cast_origin_offset_m: float = 4.0
 
 # Preloaded (not class_name) so the isolated --check-only gate doesn't false-error on the sibling type.
 const _SPELL_TRACER := preload("res://entities/projectiles/spell_tracer.gd")
@@ -118,13 +128,38 @@ func _host_apply_set_blend(new_form_idx: int, new_element_idx: int) -> void:
 
 
 # ── RPC: client → host cast request ──
+# The client's begin_cast() gate is FEEL, not authority — the host enforces the cast rate here on
+# its own copy of this wand (its _cooldown already ticks on every peer; only this RPC sets it on
+# the host copy, since begin_cast runs owner-only). Origin/direction are client-supplied intent:
+# direction is re-normalized, origin is clamped near the caster's authoritative body position.
 @rpc("any_peer", "call_remote", "reliable")
 func _request_cast(origin: Vector3, direction: Vector3) -> void:
 	if not multiplayer.is_server():
 		return
 	var caster_peer := multiplayer.get_remote_sender_id()
-	if equipped_spell:
-		equipped_spell.cast_on_host(get_tree().current_scene, origin, direction, caster_peer)
+	if equipped_spell == null:
+		return
+	if direction.length_squared() < 0.0001:
+		return  # degenerate aim — a zero direction would spawn a bolt that never moves
+	if _cooldown > host_cast_gate_tolerance_sec:
+		return  # faster than cast_delay_sec allows (beyond jitter slack) — drop the request
+	_cooldown = cast_delay_sec
+	equipped_spell.cast_on_host(
+		get_tree().current_scene, _clamp_origin_to_body(origin), direction.normalized(), caster_peer)
+
+
+# Pull a client-supplied cast origin back toward the caster's body if it's implausibly far
+# (forged, or badly stale). The wand's parent IS the player node; on the host that body position
+# is the authoritative one. Falls through unchanged when the parent isn't a Node3D (defensive —
+# the wand is always added to the player in player.gd).
+func _clamp_origin_to_body(origin: Vector3) -> Vector3:
+	var body := get_parent() as Node3D
+	if body == null:
+		return origin
+	var from_body := origin - body.global_position
+	if from_body.length_squared() <= max_cast_origin_offset_m * max_cast_origin_offset_m:
+		return origin
+	return body.global_position + from_body.limit_length(max_cast_origin_offset_m)
 
 
 # ── RPC: client → host equip-change request ──
