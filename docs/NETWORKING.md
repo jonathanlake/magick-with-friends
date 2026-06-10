@@ -25,7 +25,7 @@ is a client. There is no dedicated server and no relay (yet — see §10).
 
 ## 2. The Transport Seam — `NetworkManager`
 
-`autoloads/network_manager.gd` is the **only** file that knows ENet exists. Everything else
+`framework/autoloads/network_manager.gd` is the **only** file that knows ENet exists. Everything else
 calls four functions and listens to five signals.
 
 | Function | Returns | What it does |
@@ -282,18 +282,19 @@ test fixture. This section is the map of what carries to the next game.)
   seam for host validation / prediction).
 - The **health pattern** (§8) — `HealthComponent` + host RPC value-sync.
 - `HitFlashComponent` — reusable cosmetic feedback incl. the `any_peer` broadcast exception.
-- The **DEBUG autoload** — two-window autostart + the headless smoke driver (`debug/debug.gd`,
+- The **DEBUG autoload** — two-window autostart + the headless smoke driver (`framework/debug/debug.gd`,
   `tools/smoke-test.sh`).
 - The menu's connect/host flow incl. all §9 failure handling.
 
 **Game-specific (replace per game):** the player controller, the spell system
-(`systems/spells/`, see `docs/SPELLS.md`), `Reactions`, `WaveDirector`, enemy AI, the level
+(`games/magick/spells/`, see `docs/SPELLS.md`), `Reactions`, `WaveDirector`, enemy AI, the level
 scene, the HUD.
 
 **Standing up a new game on the spine — checklist:**
 
-1. Keep `autoloads/` (all four), `components/` (input sync, health, hit flash), `debug/`,
-   `tools/`, the menu, and `main.tscn`'s spawner + `peer_ready` skeleton.
+1. Keep `framework/` wholesale — autoloads (GameEvents/GameManager/NetworkManager), components
+   (input sync, health, hit flash, animators, smoother), `framework/debug/`, the menu + console —
+   plus `tools/` and `main.tscn`'s spawner + `peer_ready` skeleton.
 2. Replace `TestLevel` with your level — `main.gd` finds `PlayerSpawnPosition` via
    `find_child`, so any level with that marker works.
 3. Replace the `Player` scene; keep the contract: node named `str(peer_id)`, authority set in

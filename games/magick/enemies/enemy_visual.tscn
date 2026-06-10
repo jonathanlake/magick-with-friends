@@ -1,7 +1,7 @@
 [gd_scene load_steps=9 format=3]
 
 [ext_resource type="PackedScene" uid="uid://dljkcvimb8oiu" path="res://assets/models/skeleton_minion/skeleton_minion.glb" id="1_skel"]
-[ext_resource type="Script" path="res://components/locomotion_animator.gd" id="2_anim"]
+[ext_resource type="Script" path="res://framework/components/locomotion_animator.gd" id="2_anim"]
 
 [sub_resource type="AnimationNodeAnimation" id="Anim_idle"]
 animation = &"Idle"

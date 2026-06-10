@@ -62,13 +62,12 @@ tiebreaker. The roadmap is framework milestones (`DESIGN.md`), led by real-onlin
 - **Swappable transport.** All network peer creation lives in `NetworkManager.host_game()`
   and `NetworkManager.join_game()` only. No other file may import or reference
   `ENetMultiplayerPeer` (or any future transport class) directly.
-- **Import direction (spine → game, never the reverse).** Spine files — `network_manager.gd`,
-  `game_manager.gd`, `game_events.gd`, everything in `components/`, `debug/`, `ui/main_menu/`,
-  `ui/console/` — must not gain **new** references to game nouns (spells, waves, enemies).
-  Game/fixture code imports the spine. Known debts (tagged FIXTURE in the file map, separated
-  at roadmap milestone 2): `spell_catalog.gd` is fixture code parked in `autoloads/`,
-  `game_events.gd` carries fixture `enemy_*` signals, `main.gd`/`main.tscn` are the mixed
-  composition root, `ui/hud/` is fixture-leaning. Don't deepen these debts.
+- **Import direction (spine → game, never the reverse).** Nothing under `framework/` may gain
+  **new** references to game nouns (spells, waves, enemies); game code (`games/<name>/`)
+  imports the spine. The directory split IS the rule made visible (milestone 2). Two known
+  debts remain, named follow-ups — don't deepen them: `framework/autoloads/game_events.gd`
+  still carries fixture `enemy_*` signals, and `main.gd`/`main.tscn` are the mixed composition
+  root (split when the next prototype forces game/level selection).
 
 ---
 
@@ -76,7 +75,7 @@ tiebreaker. The roadmap is framework milestones (`DESIGN.md`), led by real-onlin
 
 ### NetworkManager — Swappable Transport Layer
 
-`NetworkManager` (`autoloads/network_manager.gd`) is the **only** file that knows which
+`NetworkManager` (`framework/autoloads/network_manager.gd`) is the **only** file that knows which
 transport is in use. The rest of the codebase calls `host_game() -> Error` /
 `join_game(ip, port) -> Error` / `disconnect_game()` / `kick_peer(id)` (host-only) and listens
 to its signals (`connection_succeeded`, `connection_failed`, `server_disconnected`,
@@ -178,10 +177,10 @@ func _enter_tree() -> void:
 
 ### GameConfig / GameManager
 
-`GameConfig` (`resources/game_config.gd`) is a `Resource` holding session-level settings
+`GameConfig` (`framework/resources/game_config.gd`) is a `Resource` holding session-level settings
 (`max_players`, `respawn_time`). It is not an autoload — plain data; expect run-level fields.
 
-`GameManager` (`autoloads/game_manager.gd`) is an autoload `Node` owning a `GameConfig`
+`GameManager` (`framework/autoloads/game_manager.gd`) is an autoload `Node` owning a `GameConfig`
 (`GameManager.config`) + the local `player_name`. The host sets config before starting the
 server; all systems read from `GameManager.config`. Natural home for future run/wave state.
 
@@ -208,7 +207,7 @@ The climbing/parkour camera path has been **removed**.
 ### Animation (LocomotionAnimator + AnimationTree)
 
 Players and enemies use KayKit models (gitignored `/assets/`) animated through one reusable
-`components/locomotion_animator.gd` on each **visual scene root** (`player_visual.tscn` /
+`framework/components/locomotion_animator.gd` on each **visual scene root** (`player_visual.tscn` /
 `enemy_visual.tscn`):
 
 - **Tree shape.** The animator reads an `AnimationTree`. Both player and enemy use the SAME shape now:
@@ -262,7 +261,7 @@ is `docs/SPELLS.md`:
 - **Modifier** — optional; Split / Bounce / Homing **omitted in the slice** (they erode the
   per-cast legibility blend exists to protect).
 
-Implemented as `@export`-driven Resources under `systems/spells/` (`Spell` / `SpellForm` /
+Implemented as `@export`-driven Resources under `games/magick/spells/` (`Spell` / `SpellForm` /
 `SpellElement` / `BlendSpell`), cast by a `WandComponent` on the player holding the
 `(Form, Element)` pair and enforcing `cast_delay_sec`. `Spell` exposes a `cast_on_host()` seam so
 an authored `CascadeSpell` (a deferred cascade experiment — cut from the slice, see `DESIGN.md`)
@@ -281,131 +280,114 @@ reframe** — the dev-console `give [all]` stand-in remains. Frozen design ratio
 ## File Map
 
 ```
-autoloads/
-  game_events.gd              — Global signal bus. Add signals here, not in random scripts.
+framework/                    ══ THE SPINE (game-agnostic; the future addon/repo-split unit) ══
+  autoloads/
+    game_events.gd            — Global signal bus. Add signals here, not in random scripts.
                                 Has `enemy_died`, `enemy_count_changed(count)` + `alive_enemy_count`
                                 (register_enemy/unregister_enemy), and `local_player_damaged` (FP
                                 hit cue, via `emit_local_player_damaged()`). Fuller vocabulary is
                                 DESIGN.md backlog. NOTE: the `enemy_*` signals are fixture nouns on
-                                a spine autoload — an import-direction debt, cleaned at milestone 2.
-  game_manager.gd             — Autoload Node. Owns GameConfig + local player_name.
-  spell_catalog.gd            — FIXTURE (parked in autoloads/ — moves under games/ at milestone 2).
-                                Index-stable Form/Element arrays + `make_blend(f,e)` so every peer
-                                builds the SAME spell from replicated indices. BUILT.
-  network_manager.gd          — Transport abstraction. ONLY file that touches ENet/Steam/relay.
-
-components/
-  health_component.gd/.tscn   — max_health (export, default 100), current_health, damage(int),
+                                a spine autoload — an import-direction debt (named follow-up).
+    game_manager.gd           — Autoload Node. Owns GameConfig + local player_name.
+    network_manager.gd        — Transport abstraction. ONLY file that touches ENet/Steam/relay.
+  components/
+    health_component.gd/.tscn — max_health (export, default 100), current_health, damage(int),
                                 died + damaged signals. Reused by players and enemies.
-  hit_flash_component.gd/.tscn — Reusable damage flash. @export target_root_path / flash_color /
-                                flash_duration_sec / health_component_path / skip_on_lethal. Auto-wires to a
-                                HealthComponent's `damaged`; host fans the cosmetic flash to all
-                                peers via an `any_peer` RPC (deliberate — see RPC Pattern exception:
-                                player nodes are client-owned). Used by players + enemies.
-  stamina_component.gd/.tscn   — Two-pool resource + `depleted` signal. OFF the player; files
-                                kept, unused — reserved for a future mana pool.
-  player_input_synchronizer_component.gd/.tscn
+    hit_flash_component.gd/.tscn — Reusable damage flash. @export target_root_path / flash_color /
+                                flash_duration_sec / health_component_path / skip_on_lethal.
+                                Auto-wires to a HealthComponent's `damaged`; host fans the cosmetic
+                                flash to all peers via an `any_peer` RPC (deliberate — see RPC
+                                Pattern exception: player nodes are client-owned).
+    stamina_component.gd/.tscn — Two-pool resource + `depleted` signal. Unused — reserved for a
+                                future mana/oxygen-style pool.
+    player_input_synchronizer_component.gd/.tscn
                               — Extends MultiplayerSynchronizer. Gathers input on the authority
                                 peer, replicates it (mode 2). Syncs `movement_vector` (WASD) +
-                                `is_jump_pressed`. Cast is RPC-driven; interact is roadmap.
-                                NOTE: the synced fields are consumed ONLY by the owning peer
-                                today — remote copies simulate nothing from input (movement
-                                replicates as position). The mode-2 replication is kept on
-                                purpose as the seam for host-side input validation or
+                                `is_jump_pressed`. NOTE: the synced fields are consumed ONLY by
+                                the owning peer today — remote copies simulate nothing from input
+                                (movement replicates as position). The mode-2 replication is kept
+                                on purpose as the seam for host-side input validation or
                                 client-side prediction if real-latency playtests demand them
-                                (DESIGN.md authority decision); don't "optimize" it away
-                                without revisiting that decision.
-  locomotion_animator.gd      — Reusable script on a visual scene root. Drives a locomotion
+                                (DESIGN.md authority decision); don't "optimize" it away.
+    locomotion_animator.gd    — Reusable script on a visual scene root. Drives a locomotion
                                 BlendSpace1D (idle↔run) from a fed speed, fires a OneShot
                                 (`fire_oneshot`) for a layered action, code-sets the OneShot's
                                 upper-body filter (`oneshot_filter_paths`), and (opt-in) attaches a
-                                SpinePitchModifier (`spine_pitch_bone`, fed by `feed_pitch`) + a staff
-                                BoneAttachment3D (`staff_bone`, read via `staff_muzzle_position()`).
-                                See Animation below. BUILT.
-  spine_pitch_modifier.gd     — SkeletonModifier3D: tilts one bone (the player's `spine`) up/down by a
-                                fed look-pitch, after the AnimationTree, so the torso aims while legs
-                                stay planted. Attached in code by locomotion_animator. BUILT.
-
-entities/
-  player/
-    player.gd                 — First-person CharacterBody3D controller: run / jump / look / cast /
-                                death-state (velocity + move_and_slide + is_on_floor). Authors
-                                replicated `aim_yaw` + `anim_speed` and feeds the Visual's animator
-                                each frame. On REMOTE copies, decouples the Visual (top_level) and eases
-                                it toward the synced body position/facing (`remote_smoothing_rate`) so
-                                teammates glide, not stutter. Climbing/parkour removed.
-    player.tscn               — FP body, InputSync, MultiplayerSynchronizer, HealthComponent,
-                                HitFlashComponent, a `Visual` instance of player_visual.tscn (with
-                                NameLabel parented under it so it rides the smoothed transform),
-                                capsule collider, camera. (WandComponent is added in code.)
-    player_visual.tscn        — The visible rig: KayKit Mage (.glb) + an AnimationTree (BlendTree:
-                                idle↔run BlendSpace1D + a OneShot cast) + LocomotionAnimator. BUILT.
-  projectiles/                — FIXTURE. projectile.gd/.tscn: host-spawned + host-resolved spell projectile
-                                (Area3D); its mesh is hidden for the caster (FP dual-visual). BUILT.
-                                spell_tracer.gd: a LOCAL-only first-person cosmetic bolt the caster sees
-                                fly straight from screen-center (the networked bolt — hidden for them —
-                                leaves the staff so others see that). Cosmetic, never networked. BUILT.
-  enemies/                    — FIXTURE. enemy_base.gd/.tscn: EnemyBase (CharacterBody3D + HealthComponent +
-                                HitFlashComponent; host AI: gravity / steer / cooldown'd melee;
-                                authors replicated `anim_speed` + `face_yaw`; attack-swing RPC).
-                                enemy_visual.tscn: KayKit Skeleton (.glb) + AnimationTree
-                                (BlendTree: idle↔run + a OneShot attack) + LocomotionAnimator. BUILT.
-  pickups/                    — (CUT by the framework reframe — was the interact-to-swap pickup
-                                loop; the console `give` stand-in covers fixture needs.)
-
-systems/
-  spells/                     — FIXTURE. Spell/SpellForm/SpellElement/BlendSpell resources +
-                                WandComponent. BUILT.
-  reactions/                  — FIXTURE. reactions.gd: host-central resolver (Node under Main).
-                                Direct damage + entity reactions (lightning chain incl. allies,
-                                fire burn/DoT); cosmetic broadcasts. BUILT (entity reactions;
-                                Area3D world volumes frozen with the fixture).
-  director/                   — FIXTURE. wave_director.gd: host-side escalating ring spawner
-                                (timer + waves, alive cap). Boots PAUSED (`auto_start = false`) —
-                                the host begins the round via the console `start`. BUILT.
-
-resources/
-  game_config.gd              — Resource. max_players, respawn_time. Not an autoload.
-
-ui/
-  main_menu/                  — Host/join flow. Validates name, parses IP:port (default 127.0.0.1:3000).
-  hud/                        — DEV debug HUD (CanvasLayer): spell + HP + enemy/player counts + FPS
-                                readout, crosshair, death fade, host-left + self-damage overlays.
-                                Fixture-leaning (spell/enemy readouts) — an import-direction debt.
-  console/                    — dev_console.gd: dev console (backtick). Mounted on EVERY peer in
+                                SpinePitchModifier (`spine_pitch_bone`, fed by `feed_pitch`) + a
+                                staff BoneAttachment3D (read via `staff_muzzle_position()`).
+                                See Animation above. BUILT.
+    spine_pitch_modifier.gd   — SkeletonModifier3D: tilts one bone up/down by a fed look-pitch,
+                                after the AnimationTree. Attached in code by locomotion_animator.
+    remote_visual_smoother.gd — Eases a remote copy's decoupled Visual toward the snapped body
+                                (rate clamp, snap guard, respawn park). See Replication Modes.
+  debug/
+    debug.gd                  — Dev-only helper. DEBUG autoload, DISABLED by default. Two-window
+                                autostart (`-- host/join debug_autostart`) + `-- smoke` driver.
+  resources/
+    game_config.gd            — Resource. max_players, respawn_time. Not an autoload.
+  ui/
+    main_menu/                — Host/join flow. Validates name, parses ip[:port] for both host
+                                and join (default 127.0.0.1:3000), surfaces failures.
+    console/                  — dev_console.gd: dev console (backtick). Mounted on EVERY peer in
                                 main.gd, gated by role: HOST gets the full set (help / start /
                                 give [all] / players / wave / enemies [off|on|clear] / clear); a
-                                CLIENT gets only help / clear (host-only cmds print "host only"),
-                                with a seam (`_HOST_ONLY`) for future client-side commands. BUILT.
+                                CLIENT gets help / clear, with a seam (`_HOST_ONLY`) for future
+                                client-side commands. BUILT.
 
-debug/
-  debug.gd                    — Dev-only helper. DEBUG autoload, DISABLED by default. Two-window
-                                autostart (`-- host/join debug_autostart`) + `-- smoke` driver.
-
-tools/
-  smoke-test.sh               — Headless gameplay smoke test (see Headless Validation).
+games/magick/                 ══ THE FIXTURE (frozen as a game; exercises the spine) ══
+  spell_catalog.gd            — Autoload (game-owned). Index-stable Form/Element arrays +
+                                `make_blend(f,e)` so every peer builds the SAME spell from
+                                replicated indices. BUILT.
+  spells/                     — Spell/SpellForm/SpellElement/BlendSpell resources +
+                                WandComponent. BUILT.
+  reactions/                  — reactions.gd: host-central resolver (Node under Main). Direct
+                                damage + entity reactions (lightning chain incl. allies, fire
+                                burn/DoT); cosmetic broadcasts. BUILT (Area3D world volumes
+                                frozen with the fixture).
+  director/                   — wave_director.gd: host-side escalating ring spawner (timer +
+                                waves, alive cap). Boots PAUSED (`auto_start = false`) — the host
+                                begins the round via the console `start`. BUILT.
+  player/
+    player.gd                 — First-person CharacterBody3D controller: run / jump / look /
+                                cast / death-state. Authors replicated `aim_yaw` + `aim_pitch` +
+                                `anim_speed`; on REMOTE copies decouples the Visual and smooths
+                                it (RemoteVisualSmoother). Fixture-coupled via the wand/cast —
+                                a generic-FP-controller module extraction is future work.
+    player.tscn               — FP body, InputSync, MultiplayerSynchronizer, HealthComponent,
+                                HitFlashComponent, Visual (player_visual.tscn, NameLabel under
+                                it), capsule collider, camera. (WandComponent added in code.)
+    player_visual.tscn        — KayKit Mage (.glb) + AnimationTree + LocomotionAnimator. BUILT.
+  enemies/                    — enemy_base.gd/.tscn (host AI: steer/melee; replicated anim
+                                drivers; attack-swing RPC) + enemy_visual.tscn (KayKit Skeleton).
+  projectiles/                — projectile.gd/.tscn: host-spawned + host-resolved spell bolt
+                                (mesh hidden for the caster — FP dual-visual). spell_tracer.gd:
+                                the caster-only local cosmetic bolt. BUILT.
+  hud/                        — DEV debug HUD (CanvasLayer): spell + HP + counts + FPS,
+                                crosshair, death fade, host-left + self-damage overlays.
+  levels/test_level.tscn      — Walled horde arena (CSG floor + 4 perimeter walls).
 
 docs/
   NETWORKING.md               — Reference-led: the multiplayer spine traced end-to-end —
                                 transport seam, authority tables, every replicated property,
-                                the full RPC catalog, connect/disconnect/death lifecycles, the
-                                edge-case matrix, and the reusing-the-spine checklist.
+                                the full RPC catalog, lifecycles, the edge-case matrix, and the
+                                reusing-the-spine checklist.
   SPELLS.md                   — Reference-led: the BLEND system class-by-class — every @export,
-                                the cast pipeline (FP dual-visual, release timing), hit +
-                                reaction resolution, the cosmetic layer, how to add content.
+                                the cast pipeline, hit + reaction resolution, how to add content.
 
-main.gd                       — Spawner setup (player/projectile/enemy), peer_ready RPC,
-                                spawn_functions, host damage/death/respawn RPCs + self-damage cue,
-                                HUD + host-only console mount, host-disconnect handling.
+tools/
+  smoke-test.sh               — Headless gameplay smoke test (see Headless Validation).
+
+main.gd                       — MIXED composition root (spine spawner/peer_ready/damage skeleton
+                                + fixture spawn_functions/forwarders). Splitting it per-game is a
+                                named milestone-2 follow-up, forced by the next prototype.
 main.tscn                     — World root: player/projectile/enemy MultiplayerSpawners,
                                 Projectiles/Enemies containers, WaveDirector, + a level.
-test_level.tscn               — Walled horde arena (CSG floor + 4 perimeter walls). Combat sandbox.
 project.godot                 — Autoloads, input map (move_*, cast, jump), Jolt, 1920×1080,
                                 D3D12. config_name = "Magick With Friends".
 ```
 
-(For built-vs-roadmap status, the `BUILT` / `(roadmap)` tags above + the `DESIGN.md` roadmap
-are the source of truth.)
+(For built-vs-planned status, the `BUILT` tags above + the `DESIGN.md` framework roadmap are
+the source of truth.)
 
 ---
 
@@ -437,13 +419,13 @@ spine-vs-fixture split is mapped in `docs/NETWORKING.md` §10):
 
 ## DEBUG Autoload — Dev Workflow
 
-`debug/debug.gd` is registered as the `DEBUG` autoload in `project.godot` **without** the `*`
+`framework/debug/debug.gd` is registered as the `DEBUG` autoload in `project.godot` **without** the `*`
 prefix, so it is **disabled by default**. It never runs in normal play or exported builds.
 
 ### Enabling for local two-window testing
 
 1. **Enable the autoload** — Project Settings → Autoload → check `DEBUG` (or add `*` before
-   `res://debug/debug.gd` in `project.godot`).
+   `res://framework/debug/debug.gd` in `project.godot`).
 2. **Configure Run Instances** — Debug → Customize Run Instances, two instances:
 
    | Instance | Arguments |
@@ -460,13 +442,13 @@ prefix, so it is **disabled by default**. It never runs in normal play or export
 
 | Step | Enabled | Disabled |
 |------|---------|----------|
-| `project.godot` DEBUG line | `DEBUG="*res://debug/debug.gd"` | `DEBUG="res://debug/debug.gd"` |
+| `project.godot` DEBUG line | `DEBUG="*res://framework/debug/debug.gd"` | `DEBUG="res://framework/debug/debug.gd"` |
 | Run Instances Launch Arguments | `-- host/join debug_autostart` | **cleared** |
 
 **Important:** Godot passes Launch Arguments even when "Override Main Run Args" is unchecked.
 **Clear the Launch Arguments**, not just the autoload. Both steps are required.
 
-**Rule:** Never commit `project.godot` with `DEBUG="*res://debug/debug.gd"`. The `*` is dev-local only.
+**Rule:** Never commit `project.godot` with `DEBUG="*res://framework/debug/debug.gd"`. The `*` is dev-local only.
 
 ---
 

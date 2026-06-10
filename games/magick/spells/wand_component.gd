@@ -29,7 +29,7 @@ extends Node
 @export var max_cast_origin_offset_m: float = 4.0
 
 # Preloaded (not class_name) so the isolated --check-only gate doesn't false-error on the sibling type.
-const _SPELL_TRACER := preload("res://entities/projectiles/spell_tracer.gd")
+const _SPELL_TRACER := preload("res://games/magick/projectiles/spell_tracer.gd")
 
 # Catalog indices for the equipped blend; set by player.gd before this node enters the tree.
 var form_idx: int = 0

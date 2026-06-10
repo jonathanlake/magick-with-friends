@@ -29,7 +29,7 @@ discipline rule.
 
 ## 2. Class Reference
 
-### `Spell` — `systems/spells/spell.gd` (`Resource`)
+### `Spell` — `games/magick/spells/spell.gd` (`Resource`)
 
 The base seam. `WandComponent` holds one; subclasses implement the actual effect.
 
@@ -43,7 +43,7 @@ The base seam. `WandComponent` holds one; subclasses implement the actual effect
 The `cast_on_host` seam exists so a differently-shaped spell (e.g. the deferred `CascadeSpell`
 experiment) can slot in without touching the wand.
 
-### `SpellForm` — `systems/spells/spell_form.gd` (`Resource`)
+### `SpellForm` — `games/magick/spells/spell_form.gd` (`Resource`)
 
 The delivery shape. Element-agnostic.
 
@@ -55,7 +55,7 @@ The delivery shape. Element-agnostic.
 | `aoe_radius` | float | 0.0 | `0` = single-target; `> 0` = burst radius |
 | `explode_on_impact` | bool | false | detonate on first contact (or at lifetime end) into `aoe_radius` |
 
-### `SpellElement` — `systems/spells/spell_element.gd` (`Resource`)
+### `SpellElement` — `games/magick/spells/spell_element.gd` (`Resource`)
 
 The damage + reaction layer. `enum Reaction { NONE, FIRE, LIGHTNING }`.
 
@@ -69,7 +69,7 @@ The damage + reaction layer. `enum Reaction { NONE, FIRE, LIGHTNING }`.
 | `chain_count` / `chain_range` / `chain_falloff` | int / float / float | 0 / 6.0 / 0.6 | LIGHTNING: max extra jumps / jump distance / damage multiplier per jump |
 | `burn_dps` / `burn_duration_sec` | int / float | 0 / 0.0 | FIRE: DoT rate and length |
 
-### `BlendSpell` — `systems/spells/blend_spell.gd` (extends `Spell`)
+### `BlendSpell` — `games/magick/spells/blend_spell.gd` (extends `Spell`)
 
 Fuses `@export var form: SpellForm` + `@export var element: SpellElement`. Its `cast_on_host`
 **flattens both into a flat Dictionary of primitives** (no Resource crosses the wire) and calls
@@ -78,7 +78,7 @@ damage, color, reaction, chain_count, chain_range, chain_falloff, burn_dps, burn
 owner`. Cosmetic getters read from the element (color/SFX) and form (speed/lifetime).
 `describe()` prefers the themed `display_name`, falling back to `"<Element> <Form>"`.
 
-### `SpellCatalog` — `autoloads/spell_catalog.gd` (autoload `Node`)
+### `SpellCatalog` — `games/magick/spell_catalog.gd` (autoload `Node`)
 
 The single source of truth for what can be cast — and the future loot table for pickups.
 
@@ -91,7 +91,7 @@ The single source of truth for what can be cast — and the future loot table fo
   (`"0,0": "Firebolt"` …), fallback `"<Element> <Form>"`.
 - `form_count()` / `element_count()` — used by the random deal and the debug cycle.
 
-### `WandComponent` — `systems/spells/wand_component.gd` (`Node`)
+### `WandComponent` — `games/magick/spells/wand_component.gd` (`Node`)
 
 Holds the equipped spell, gates the cast rate, and routes casting. **Added in code** by
 `player.gd:_ready` on *every* peer's copy of the player (same node path on all peers — RPC
@@ -115,7 +115,7 @@ RPCs: see the catalog in `docs/NETWORKING.md` §6. Note `_request_cast` is where
 enforces** the cast rate (its copy's `_cooldown` ticks on every peer; only this RPC sets it on
 the host copy) and clamps the client-supplied origin.
 
-### `Projectile` — `entities/projectiles/projectile.gd` (`Area3D`)
+### `Projectile` — `games/magick/projectiles/projectile.gd` (`Area3D`)
 
 The host-authoritative networked bolt. Spawned on **every** peer by Main's `ProjectileSpawner`
 with the same config (visuals match); only the host moves it and resolves hits.
@@ -134,14 +134,14 @@ with the same config (visuals match); only the host moves it and resolves hits.
   the caster sees their local tracer instead, everyone else sees this bolt leave the staff. The
   hidden bolt still does **all** the damage (Area3D monitoring ignores mesh visibility).
 
-### `SpellTracer` — `entities/projectiles/spell_tracer.gd` (`MeshInstance3D`)
+### `SpellTracer` — `games/magick/projectiles/spell_tracer.gd` (`MeshInstance3D`)
 
 The caster-only cosmetic bolt: flies dead-straight from just ahead of the camera **through the
 crosshair**, so the caster's shot reads as going where they aimed. Never networked, no
 collision, zero damage. Frees itself at the crosshair-hit distance (`max_dist`) or at the
 spell's lifetime, whichever comes first. Spawned by `WandComponent.fire_fp_cast` at input time.
 
-### `Reactions` — `systems/reactions/reactions.gd` (`Node` under Main)
+### `Reactions` — `games/magick/reactions/reactions.gd` (`Node` under Main)
 
 The reaction table + the single home for spell-hit **damage routing**. Host-only logic;
 cosmetics fan to all peers via `authority` RPCs (this node is host-owned, unlike player nodes).
@@ -166,11 +166,11 @@ tick live here, on the host.
 
 ### Shared components
 
-- **`HealthComponent`** (`components/health_component.gd`): `@export max_health` (100 default;
+- **`HealthComponent`** (`framework/components/health_component.gd`): `@export max_health` (100 default;
   enemies override to 40 in `enemy_base.tscn`), `current_health`, `damage(amount)` (clamps,
   emits `damaged` then `died` at 0), `reset()`. Players: host-only writes + RPC value-sync.
   Enemies: host-only direct writes.
-- **`HitFlashComponent`** (`components/hit_flash_component.gd`): cosmetic damage flash via a
+- **`HitFlashComponent`** (`framework/components/hit_flash_component.gd`): cosmetic damage flash via a
   transient `material_overlay` (preserves textures, per-instance, no bleed). Auto-wires to a
   `HealthComponent.damaged`; the **host** fans `flash_remote.rpc()` to all peers
   (`any_peer` exception — see NETWORKING §6). `skip_on_lethal` avoids tweening an entity being

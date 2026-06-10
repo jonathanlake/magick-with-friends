@@ -19,10 +19,10 @@ config/icon="res://icon.svg"
 [autoload]
 
 GameEvents="*uid://bcwakqiporxi6"
-GameManager="*res://autoloads/game_manager.gd"
-NetworkManager="*res://autoloads/network_manager.gd"
-SpellCatalog="*res://autoloads/spell_catalog.gd"
-DEBUG="res://debug/debug.gd"
+GameManager="*res://framework/autoloads/game_manager.gd"
+NetworkManager="*res://framework/autoloads/network_manager.gd"
+SpellCatalog="*res://games/magick/spell_catalog.gd"
+DEBUG="res://framework/debug/debug.gd"
 
 [display]
 

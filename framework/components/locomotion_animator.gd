@@ -73,7 +73,7 @@ signal oneshot_released
 ## code-built BoneAttachment3D + staff_muzzle_offset above. NodePath (not a typed node) per CLAUDE.md.
 @export var staff_muzzle_marker_path: NodePath = NodePath()
 
-const _SPINE_PITCH_MODIFIER := preload("res://components/spine_pitch_modifier.gd")
+const _SPINE_PITCH_MODIFIER := preload("res://framework/components/spine_pitch_modifier.gd")
 
 var _tree: AnimationTree
 var _last_pos: Vector3
