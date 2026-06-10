@@ -3,8 +3,8 @@
 **Charter:** reference-led — what every spell class does, which properties live where, and how
 a cast flows from input to damage, with real function names. The *decisions* (why blend instead
 of Noita-style sequencing, the ~7-Form ceiling, randomness-as-keystone) live in `DESIGN.md`;
-structure rules and gotchas live in `CLAUDE.md`. **When you change spell behavior, update this
-doc in the same PR.** Code is truth.
+structure rules live in `CLAUDE.md`; dev workflow + gotchas live in `docs/DEV.md`. **When you
+change spell behavior, update this doc in the same PR.** Code is truth.
 
 ---
 

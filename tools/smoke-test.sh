@@ -4,8 +4,9 @@
 #
 # Boots a headless HOST into the actual game (Main, host player spawned), verifies it
 # reached gameplay, and fails on any logged runtime error. This is the third check of the
-# pre-PR "Headless Validation" gate (see CLAUDE.md) — it confirms the project not only
-# *loads* (parse + import checks) but actually *runs*. Host-driven only: it does not
+# pre-PR "Headless Validation" gate (see docs/DEV.md; tools/validate.sh runs all three) —
+# it confirms the project not only *loads* (parse + import checks) but actually *runs*.
+# Host-driven only: it does not
 # exercise input (casting/movement); that's what the two-window playtest is for.
 #
 # Usage:   bash tools/smoke-test.sh
