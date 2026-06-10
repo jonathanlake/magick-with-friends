@@ -127,7 +127,9 @@ per PR, validated per `CLAUDE.md`.
 prototype level on the spine (a weekend's work, no polish). This is the extraction discipline:
 prototypes pull real demands out of the framework and stop it drifting into speculative,
 fits-nothing generality. It's also the antidote to the known solo-dev failure mode where
-tool-building becomes a way to defer the scary creative work.
+tool-building becomes a way to defer the scary creative work. **The intake is
+`docs/IDEAS.md`** — the idea backlog (capture > debate; the clip / the loop / framework
+demands; promote one SEED to a gray-box monthly-ish).
 
 **Backlog (unscheduled, demand-driven):** richer `GameEvents` vocabulary
 (`player_died`, `wave_started`, …) · remote-**enemy** visual smoothing (reuse

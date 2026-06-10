@@ -373,6 +373,9 @@ docs/
                                 reusing-the-spine checklist.
   SPELLS.md                   — Reference-led: the BLEND system class-by-class — every @export,
                                 the cast pipeline, hit + reaction resolution, how to add content.
+  IDEAS.md                    — The game-idea backlog (capture > debate). Three lines per idea
+                                (the clip / the loop / framework demands) + SEED→GRAY-BOXED→
+                                PROMOTED/SHELVED statuses. Intake for DESIGN.md's cadence guard.
 
 tools/
   smoke-test.sh               — Headless gameplay smoke test (see Headless Validation).

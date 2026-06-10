@@ -7,6 +7,26 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ---
 
+## 2026-06-10 (the idea backlog)
+
+*Capture ideas in three lines, gray-box the keepers, never debate in the abstract*
+
+### 📐 Direction
+
+- **`docs/IDEAS.md` — the game-idea backlog.** Every idea gets *the clip / the loop /
+  framework demands* + a SEED→GRAY-BOXED→PROMOTED/SHELVED status; monthly-ish, one SEED gets a
+  weekend gray-box (this is the intake for DESIGN.md's cadence guard). Seeded from today's
+  brainstorm: the **party-games collection umbrella** ("Friendlympics" — each event is one
+  swappable level; variety is the product), **three-legged race** as the candidate first event
+  (a shared-body, two-input-authority entity — finally consumes the input-sync seam; latency
+  desync IS the comedy), the **shipwreck diving** idea recorded-and-shelved (enthusiasm
+  cooled; still the strongest voice-chat demand-driver), plus six quick seeds (couch movers,
+  walkie-talkie manhunt, echolocation horror, belayer+climber, tandem kayak, trawler). Also
+  records the "similar games already exist" reframe: existence is validation; the bar is
+  "would my group laugh for an hour on Friday."
+
+---
+
 ## 2026-06-10 (milestone 2: spine/game restructure · milestone 1: online verified)
 
 *The directory tree now tells the truth: framework/ is the product, games/magick/ is the fixture*
