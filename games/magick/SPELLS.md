@@ -2,7 +2,8 @@
 
 **Charter:** reference-led — what every spell class does, which properties live where, and how
 a cast flows from input to damage, with real function names. The *decisions* (why blend instead
-of Noita-style sequencing, the ~7-Form ceiling, randomness-as-keystone) live in `DESIGN.md`;
+of Noita-style sequencing, the ~7-Form ceiling, randomness-as-keystone) live in `DESIGN.md`
+beside this file (`games/magick/DESIGN.md`; framework decisions are the root `DESIGN.md`);
 structure rules live in `CLAUDE.md`; dev workflow + gotchas live in `docs/DEV.md`. **When you
 change spell behavior, update this doc in the same PR.** Code is truth.
 
@@ -261,7 +262,7 @@ muzzle flash, arcs, and burst light.
 **A new Form** (e.g. Beam): same append-to-catalog flow, but Forms carry the mechanics — if it
 isn't a projectile variant (speed/lifetime/aoe flags), it needs its own delivery implementation
 behind `cast_on_host` (a new spawned entity following the host-authoritative spawner pattern,
-NETWORKING §10 step 4). Mind the ~7-Form ceiling decision in `DESIGN.md`.
+NETWORKING §10 step 4). Mind the ~7-Form ceiling decision in `games/magick/DESIGN.md`.
 
 **Changing what a player holds at runtime:** always go through
 `WandComponent.request_set_blend(f, e)` — it resolves on the host and broadcasts `_set_blend`
