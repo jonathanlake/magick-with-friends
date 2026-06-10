@@ -1,194 +1,201 @@
-# DESIGN.md — Magick With Friends
+# DESIGN.md — the friendslop framework (working title)
 
-DESIGN is **decision-led**: vision, the locked design decisions, the build roadmap, and parked
-ideas. `CLAUDE.md` is **structure-led** (how the code is organized + the dev workflow). Expect
-some overlap — when a fact appears in both, the *decision* lives here and the *implementation
-detail* lives in `CLAUDE.md`. The blow-by-blow rationale lives in the design transcript / plan;
-the decisions here are settled unless told otherwise.
+DESIGN is **decision-led**: vision, the locked decisions, the build roadmap, and parked ideas.
+`CLAUDE.md` is **structure-led** (how the code is organized + the dev workflow); the
+**reference-led** docs (`docs/NETWORKING.md`, `docs/SPELLS.md`) trace system behavior
+end-to-end. When a fact appears in more than one place, the *decision* lives here.
+
+> **⚡ THE REFRAME (2026-06-10, supersedes "Build this game").** The product is the
+> **framework**, not the spell game. Earlier versions of this doc framed the project as
+> "build Magick With Friends and prove it's fun" with a reusable spine as a parked maybe.
+> That's inverted now: the durable goal is a **reusable host-client co-op multiplayer
+> framework for Godot** that makes standing up a 2–8-player friend-group game easy. The
+> spell game was a starter idea, isn't a passion project, and is hereby **demoted to test
+> fixture** (see the Fixture section below). Ignore any "build this game" framing in older
+> history.
 
 ---
 
-## Game Vision
+## Project Vision
 
-**Magick With Friends** is a **3D, online co-op, first-person, horde-based** game built for
-**close friend groups** (not public matchmaking). Tone is **"friend slop"** — chaotic fun,
-friendly-fire laughs, happy accidents, jank-as-charm. It is explicitly **NOT** a
-balance-tight, optimal-build competitive game.
+A **Godot 4 framework for online co-op games played with close friends** — host-client,
+2–8 players, drop-in lobbies, friendly-fire-tolerant "friend slop" tone in the games built on
+it. **Not** public matchmaking, **not** dedicated servers, **not** competitive netcode
+(no rollback or client prediction unless a real game demands it).
 
-> **Project frame.** Build **this game** and prove it's fun with friends. (A reusable
-> multiplayer-spine / swappable-mini-game-sandbox future is possible — parked in Future
-> Considerations — but it earns no architectural weight until a second game needs it.)
+**The promise:** when a game idea worth being passionate about arrives, the multiplayer
+plumbing — connection, authority, replication, spawning, session UX, voice — is already
+solid, documented, and boring, so all the energy goes into the game.
 
-> **⚠ Online status (vision vs reality):** the identity is *online* co-op, but on **this** codebase
-> only **same-machine two-window** is verified. Per-peer authority **does** propagate correctly — the
-> untested piece is **cross-machine transport** (NAT / relay / latency), not authority. Don't claim
-> "online verified" until that test is done. Full detail + the plan: the **slice playtest** (roadmap
-> item 7 below — the real-online re-verify now lives there; canonical home for this story).
+**Flagship capabilities (built or planned):**
 
-- **Core loop:** 2–4 players fight escalating hordes together in first-person.
-  **Friendly fire is ON and is a design pillar** — it's the comedy engine, not a footnote.
-- **Combat — the BLEND spell system (decided).** You wield a wand/staff that casts spells
-  built by *blending* a **Form** (delivery shape) with an **Element** (damage + reaction
-  layer). **One cast = one fused effect.** This captures the *feel* of Noita's wands
-  (combinatorial, emergent, things-go-wrong) but is deliberately **shallow** — it is **NOT**
-  Noita's sequence/program model (no triggers, timers, multicast, or nesting).
-  - **Form ceiling (~7).** Forms carry the mechanical distinctness, so the set is intentionally
-    capped at roughly seven candidates: projectile, beam, cone, wall, bubble, AoE burst, trap orb.
-    Elements stay a thin damage+reaction layer on top. (The slice ships Projectile + AoE burst.)
-- **Randomness is the keystone.** Forms/elements are dealt randomly (drops), so nobody can
-  pre-build an optimal loadout. This keeps runs fresh, blocks an external "netdeck" meta,
-  and flattens intra-group power gaps so one power-gamer friend can't pull ahead on builds.
-- **Make-or-break constraint:** chaos must be **unpredictable going in, legible in
-  hindsight.** "My fireball ricocheted into Dave" = good; "everyone took damage, nobody
-  knows why" = bad. Readable telegraphs, distinct per-element VFX, and readable reactions
-  are a **priority, not polish-later.**
-  - **Acceptance bar (how we know it passes):** after any death, the victim can **name what
-    killed them** — which element/form, and for friendly fire *whose* — within a couple
-    seconds, **unprompted**. Per effect the bar is: a distinct color + a pre-impact telegraph +
-    a readable reaction. (A playtest question, not telemetry — staying cheap.)
-  - **Measure it IN-WORLD, with no answer-printing HUD.** The bar tests whether the chaos was
-    legible from what the victim *saw* (color / telegraph / reaction), so the playtest must run with
-    **no kill-feed / "killed by X" banner** — a HUD line that prints the answer makes everyone
-    "pass" by reading it and contaminates the diagnostic. **Caster identity ("whose")** is the hard
-    part — per-element color tells you *lightning*, not *Dave* — and the slice ships per-element VFX
-    only, so expect the test to reveal whether "whose" needs **per-caster identity** (tint / trail /
-    directional hit cue). That attribution is a **deferred option**, built only if the test shows
-    it's needed — and if built, **suppressed/delayed** during any legibility test.
+- Robust connect / host / disconnect flow with honest error UX *(built; real-online
+  verification is milestone 1)*
+- Host-authoritative simulation with per-player input authority *(built — the decided
+  authority model below)*
+- Replicated spawning of players / entities with late-join replay *(built; late-join
+  state sync is milestone 3)*
+- Lobby / ready flow *(milestone 4)* · spawn points *(milestone 5)*
+- **Proximity voice chat** *(milestone 6 — the headline feature)*
+- NAT traversal / relay so friends don't fight port forwarding *(decided at milestone 1)*
+- Dev ergonomics: two-window autostart, headless validation gate, dev console *(built)*
 
-**Influences:** the co-op horde lineage (**Left 4 Dead / Vermintide / Helldivers 2**) for
-the format and the friendly-fire chaos; **Noita** for the wand-building *feel* (the blend,
-not the per-pixel simulation).
-
-### Design decisions
+### Design decisions (framework-level)
 
 **Decided (do not re-litigate or contradict):**
 
+- **Frameworks are extracted, not designed.** The framework grows by extraction from running
+  games, demand-driven — with one carve-out: the **universal set** (lobby/ready, late-join
+  sync, spawn points, voice chat, NAT/relay, disconnect UX) is predictably needed by *any*
+  friend co-op game and may be built game-free against the current fixture. Everything else
+  (ability systems, inventory, AI patterns) waits for a game to demand it.
+
+- **Import direction.** Spine code never references a game noun; game code imports the spine,
+  never the reverse. (The enforceable rule lives in `CLAUDE.md` → Rules; the spine-vs-game
+  inventory lives in `docs/NETWORKING.md` §10.)
+
 - **Authority model.** **Per-player authority** over your own character (movement, position,
   input) for crisp self-feel — each peer simulates its own player and replicates position
-  outward. **Host authority** over damage / health / death / respawn (reliable RPC *value*-sync
-  from `Main`, not a `MultiplayerSynchronizer`) and, net-new, enemies / waves / pickups / world
-  reactions — the interaction layer needs one resolver to stay consistent and *legible*. This
-  matches Godot best practice for trusted friend co-op (peer-owns-input + host-authoritative
-  health via RPC). Client-side movement prediction is **not** used; add only if real-connection
-  playtests show input lag. The split is *decided*; fully *formalizing* it in code (enemies / waves /
-  pickups / reactions) is a post-slice task, done as those systems land.
+  outward. **Host authority** over everything interactive: damage / health / death / respawn
+  (reliable RPC *value*-sync from `Main`, never a `MultiplayerSynchronizer`), entities, waves,
+  pickups, world reactions. Clients send intent; the host owns the simulation and replicates
+  outward; client cast/action *feel* is local cosmetic feedback only. This matches Godot best
+  practice for trusted friend co-op. Client-side prediction is **not** used; add only if real
+  playtests show input lag.
 
-- **Player movement controller → `CharacterBody3D`. ✅ DONE.** Migrated from `RigidBody3D` (was open;
-  decided; now implemented) — crisper, more standard FP feel, and the airborne wall-stick is gone
-  (`move_and_slide` slides along walls). Physics-chaos (knockback, ragdoll, getting shoved) becomes
-  **deliberate scripted** effects rather than emergent jank — a follow-up, none implemented yet.
-  **Enemies** are also `CharacterBody3D`.
+- **Kinematic actors.** Players and enemies are `CharacterBody3D` (`move_and_slide`);
+  physics-chaos is deliberate scripted effects, not emergent rigid-body jank. (Fixture-proven;
+  lives at the module layer, not core — a future game may ship a different controller.)
+
+- **Prototypes live in-repo; games graduate out.** New game ideas start as cheap levels /
+  game folders inside this repo (the level is already a swappable child of `main.tscn`;
+  spawning is level-agnostic). A game gets its own repo only when it becomes a real project.
+  **Repo-split trigger for the framework itself:** a second *graduated* game consuming it, or
+  wanting independently-versioned addon releases — not before.
 
 **Still open (DECIDE LATER — do not invent these):**
 
-- **Run / meta structure** beyond bare wave-survival (stages? mission arc? between-run
-  progression?) — **open.** The slice is wave-survival only.
-- **Ability resource.** Per-cast **cooldown** for now; a mana pool (repurpose
-  `StaminaComponent`) is deferred.
-
-> **Superseded:** earlier drafts committed to *third-person*, a *RoR2 roguelite* frame, and
-> *deferred combat*. All three are now decided differently (first-person; co-op horde; blend
-> combat). Ignore any third-person / RoR2-primary framing in older history.
+- **Transport for real online** — port-forwarded ENet vs `netfox.noray` vs a hosted relay.
+  Milestone 1 produces the answer; until then ENet + the swappable-transport seam stand.
+- **Voice chat implementation** — milestone 6 opens with a research spike (see roadmap).
+- **Host migration** — probably never (friend groups can re-host); revisit only if drop-outs
+  prove painful in real sessions.
 
 ---
 
-## Roadmap — What Is NOT Done (the Vertical Slice, then beyond)
+## Roadmap — Framework Milestones
 
-The immediate work is a **cheap vertical slice** — the smallest thing that lets 2–4 friends
-play and answers "is the core fun?" Built on the existing co-op framework, **one feature per
-PR**, legibility baked into each PR (not deferred). Everything is host-authoritative and
-reuses the `MultiplayerSpawner` / RPC / `GameEvents` patterns.
+Ordered by risk-burndown: verify the core promise before building on top of it. One feature
+per PR, validated per `CLAUDE.md`.
 
-1. **Player FP controller cleanup.** ✅ DONE — climbing/parkour removed, LMB → cast,
-   first-person run/jump kept; migrated to `CharacterBody3D` (see the decided item above).
-2. **Blend spell core + friendly fire + respawn.** ✅ DONE — `Spell`/`SpellForm`/
-   `SpellElement`/`BlendSpell` + `WandComponent` (Form+Element slots, `cast_delay_sec`),
-   Projectile + Fire, host-authoritative projectile spawn, FF damage on `HealthComponent`
-   (default 100), local cosmetic cast feedback, current-spell HUD, cheap respawn with a
-   death fade. Validated two-window.
-3. **Enemies + wave spawner.** ✅ BUILT — headless-validated; two-window playtest pending.
-   `EnemyBase` (CharacterBody3D + `HealthComponent`, host AI: gravity + steer to nearest alive
-   player + cooldown'd melee routed through `apply_player_damage`), replicated host→clients via
-   a `MultiplayerSynchronizer`; `systems/director/wave_director.gd` is a host-only escalating
-   ring spawner feeding a 3rd `MultiplayerSpawner`. Spells already kill enemies via the existing
-   projectile→`HealthComponent` path. Arena flattened to a walled horde box (climbing geometry
-   removed). Collision layers now named + explicit (world / players / enemies / projectiles) — see
-   `CLAUDE.md`. The wave director now **boots paused** — the host begins the round via the dev
-   console `start` (so you can set up before the horde comes).
-4. **Blend matrix + reactions + world volumes.** ✅ MOSTLY BUILT — the **2×2 Form×Element matrix**
-   + **entity reactions** (`systems/reactions/reactions.gd`: lightning chain incl. allies, fire
-   burn/DoT) landed (#33), index-stable via the `SpellCatalog` autoload. **Still pending:** the
-   1–2 `Area3D` world reactive volumes (oil, water) and the distinct per-element VFX done-criterion.
-5. **Wild-cascade A/B — CUT from the slice (deferred).** Blend is the **decided engine**, so this
-   *flavor* probe (world-sourced vs. spell-sourced chaos) can't move it, and 3 hand-authored cascades
-   vs. emergent reactions is a noisy signal for a non-pressing question. Parked — revisit only if a
-   modifier/content question makes the preference pressing. (Mechanism if ever needed: authored
-   `CascadeSpell`s via the `Spell.cast_on_host()` seam + a `spell_mode` toggle.)
-6. **Random keep-or-swap acquisition — slice stand-in.** A host-only dev-console **`give [all]`**
-   rolls a random `(Form, Element)` onto a player (reuses `SpellCatalog` + `WandComponent`'s
-   host-broadcast equip-sync) — enough to playtest the random-loadout / keep-or-swap *loop*. The full
-   enemy-dropped pickups + `interact`-to-swap (drop old as a re-grabbable pickup) is **deferred to
-   post-slice**.
-7. **The fun test — now includes the real-online check.** A light legibility tightening pass, then
-   the actual answer to "is it fun?": a **real-connection, 2-machine, 30-minute** session — **NOT**
-   two-window/LAN (zero latency hides the #1 risk). This *is* the real-online-MP re-verify, **pulled
-   up from "beyond the slice"** — latency killing cast feel is a reason it won't be fun, so it can't
-   be gated behind the slice succeeding (that's circular). Per-peer authority already propagates
-   correctly (the `spawn_function` runs on all peers; the two-window `[AUTH]` line confirms); the
-   untested piece is **cross-machine transport** (NAT / port-forwarding / relay) + **latency feel**.
-   Watch for: **cast feel under real latency** (the #1 risk — host-authoritative casting, no
-   prediction, masked only by a local muzzle flash), **friendly-fire legibility *from the world***
-   (see the acceptance bar), and the **keep/swap loop**.
+1. **Real-online verification.** The framework's core promise — *online* co-op — is verified
+   only same-machine two-window today. A **real-connection, 2-machine session over the
+   internet**: start with port-forwarded ENet (zero new code), evaluate `netfox.noray` / a
+   relay as the NAT-traversal answer. Measure: connect reliability, disconnect handling under
+   real conditions, latency feel (host-authoritative casting with no prediction is the #1
+   risk), remote-player smoothing under real jitter. Per-peer authority already propagates
+   correctly (the two-window `[AUTH]` repro in `CLAUDE.md`); the open gap is **transport**,
+   not authority.
+2. **Spine/game restructure.** Move fixture code under `games/magick/` (or similar) and the
+   spine toward an `addons/`-shaped layout, making the import-direction rule visible in the
+   directory tree. Do the moves **in the Godot editor** (several `.tscn` still lack uids;
+   editor moves keep refs intact). This is also when a `selected_level` field +
+   host-broadcast lands cleanly in `GameConfig` if multiple prototypes exist.
+3. **Late-join state push.** Close the known gap: on `peer_connected`, the host pushes
+   current health / dead flags / equip state to the new peer (reuses `_sync_health` /
+   `_set_dead` / the wand equip-sync). Required for drop-in friend sessions.
+4. **Lobby / ready flow + session UX.** Pre-game gathering: who's here, ready-up, host
+   starts; in-game join/leave notices; kicked/full/failed states surfaced with honest
+   messages (the spine already kicks and errors correctly — milestone is the UX).
+5. **Spawn-point system.** 4–8 points, assignment by player index; closes the
+   everyone-spawns-in-one-spot gap.
+6. **Proximity voice chat.** Opens with a **research spike** — Godot 4 has no built-in VoIP.
+   Candidates: an existing godot-voip-style addon · `AudioEffectCapture` + an Opus
+   GDExtension · a raw-PCM LAN-quality MVP to prove the pipe first. Proximity itself is the
+   easy half: route each speaker's stream through an `AudioStreamPlayer3D` on their player
+   node (the cast-SFX positional pattern already does exactly this). Decide build-vs-adopt
+   from the spike, then ship.
+7. **8-player validation.** `GameConfig.max_players` already scales; nothing has run above 2.
+   Verify spawner, replication bandwidth (mode-1 sync × 8), and the HUD/console at 8.
 
-**Presentation (cross-cutting, in progress).** Placeholder capsules retired for **KayKit** models
-(Mage / Skeleton). Players animate idle↔run; skeletons idle↔run + an attack swing, facing their
-target — all driven by one reusable `LocomotionAnimator`, with animation **derived locally from a
-replicated speed/facing driver** (never replicated animation state). See `CLAUDE.md` → Animation.
-Still ahead: spell VFX, wand/hands viewmodel, enemy death animation.
+**Cadence guard (process, not a milestone).** Every month or two, build a cheap throwaway
+prototype level on the spine (a weekend's work, no polish). This is the extraction discipline:
+prototypes pull real demands out of the framework and stop it drifting into speculative,
+fits-nothing generality. It's also the antidote to the known solo-dev failure mode where
+tool-building becomes a way to defer the scary creative work.
 
-Beyond the slice (only if it proves fun):
-- **GameEvents vocabulary** — replace `enemy_died` with `player_died`, `enemy_died(pos)`,
-  `wave_started`, `run_ended`, `spell_picked_up`, etc.; let callers emit directly.
-- **Run / meta structure** beyond wave-survival.
-- **Production HUD** (health/shield, current spell, wave/timer).
-- **Spawn point system** (4–8 points, by player index).
-- **Remote-movement smoothing — partly done.** Remote *players* now glide via a client-side visual
-  lerp toward the synced position (PR #55, the community-standard fix). Still open: the same smoothing
-  on **remote enemies** (deferred — their slow/distant motion hides the stutter for now), and the
-  deeper **velocity-sync / extrapolation** option (replicate velocity, not just position) only if the
-  simple lerp proves insufficient over real latency.
-- **More Forms/Elements**, modifiers (constrained), downed/revive.
+**Backlog (unscheduled, demand-driven):** richer `GameEvents` vocabulary
+(`player_died`, `wave_started`, …) · remote-**enemy** visual smoothing (reuse
+`RemoteVisualSmoother`) · scripted knockback/ragdoll · production HUD patterns · gamepad
+bindings · spectator camera for dead players · Steam transport (`SteamMultiplayerPeer` behind
+the existing seam).
+
+---
+
+## Fixture Game: Magick With Friends (demoted — no new investment as a game)
+
+The spell-casting horde game is the framework's **test fixture**: the runnable consumer that
+exercises connection, authority, replication, spawning, combat-shaped RPCs, and the validation
+harness (`tools/smoke-test.sh` boots it; the two-window workflow plays it). It is kept because
+a framework without a consumer can't be validated — and replaced organically whenever a
+prototype exercises the spine better.
+
+**The rule:** fixture work happens only when it *blocks a framework milestone* (e.g. its
+equip-sync is the late-join test case). No new Forms, no pickups loop, no legibility passes,
+no fun-tuning. **Superseded by the reframe:** the keep-or-swap acquisition loop (old item 6),
+the legibility tightening pass, and the "is it fun?" playtest question (the 2-machine session
+survives as framework milestone 1, stripped of its fun-test framing).
+
+### Recorded design decisions (kept because they explain the code)
+
+These shaped the code that exists; they are *frozen*, not deleted:
+
+- **Vision (as a game):** 3D, online co-op, first-person horde for close friend groups;
+  "friend slop" tone — chaotic fun, friendly-fire laughs (FF is ON and was a design pillar);
+  influences: L4D/Vermintide/Helldivers for format, Noita for the wand *feel*.
+- **Combat — the BLEND spell system.** A wand casts a **Form × Element** fusion; **one cast =
+  one fused effect**, deliberately shallow — NOT Noita's sequence/program model (no triggers,
+  timers, multicast, nesting). **Form ceiling ~7** (projectile, beam, cone, wall, bubble, AoE
+  burst, trap orb — slice shipped Projectile + Burst); Elements stay a thin damage+reaction
+  layer (slice: Fire, Lightning). Modifiers (Split/Bounce/Homing) were cut — they erode
+  per-cast legibility. Full mechanics: `docs/SPELLS.md`.
+- **Randomness as keystone:** forms/elements dealt randomly so nobody pre-builds an optimal
+  loadout (blocks netdecking, flattens intra-group power gaps).
+- **The legibility north star:** chaos must be *unpredictable going in, legible in hindsight* —
+  after any death the victim can name what killed them (element/form, and whose) within
+  seconds, unprompted, **from what they saw in-world** (no kill-feed during tests). Per-element
+  color + telegraph + readable reaction is the bar. Per-caster attribution was a deferred
+  option. (Frozen with the fun test; recorded because the per-element VFX/color plumbing in
+  the code exists to serve it.)
+- **Reactions are two cheap layers, not a pixel sim:** entity status (lightning chains incl.
+  allies, fire burn/DoT — built) + hand-placed `Area3D` world volumes (oil, water — never
+  built; frozen).
+- **What was built and verified** (two-window): blend casting, friendly fire, death/respawn,
+  enemies + escalating wave director, reactions, KayKit presentation with replicated-driver
+  animation, remote-player visual smoothing. The wild-cascade A/B experiment was cut
+  (mechanism preserved: the `Spell.cast_on_host()` seam + an authored `CascadeSpell` slot in
+  cleanly if ever wanted).
 
 ---
 
 ## Future Considerations (Do Not Implement Yet)
 
-- **Noita-style material simulation.** The blend reaction layer uses cheap `Area3D` volumes,
-  NOT a per-pixel falling-sand sim. Full simulation (fire spreading per-pixel, liquids,
-  electrified water at sim fidelity) is expensive and hard to net-replicate in 3D — stay with
-  tagged volumes / area triggers until there's a reason not to.
-- **Mana resource** — repurpose `StaminaComponent` if cooldowns prove too shallow.
-- **Steam networking** — replace the ENet peer with `SteamMultiplayerPeer`; keep all
-  spawn/RPC logic identical (the point of `NetworkManager`).
-- **Cloudflare Workers / WebSocket relay** — online play without port forwarding.
-- **netfox (or equivalent) as a networking foundation.** Evaluated when fixing remote-movement jitter
-  (PR #55) and deliberately deferred: its rollback/prediction core is overkill for host-authoritative
-  co-op, and its smoothing piece (`TickInterpolator`) is no better than the simple visual lerp we
-  shipped. Revisit as **one** decision if/when we want **lag compensation** (server-rewind for precise
-  PvP hits), **client-side prediction** (snappier remote feel), or **`netfox.noray`** for NAT
-  punch-through / relay (the "play without port forwarding" need — overlaps the relay bullet above).
-  Adopt the foundation on its own merits, not to patch a symptom.
-- **Lobby / ready system**, **spectator camera** for dead players, **gamepad** bindings +
-  right-stick look.
-- **Multiplayer sandbox / swappable mini-game levels.** The longer-term broadening introduced in
-  the *Project frame* (top of this doc): keep the netcode spine **constant** and let the *level* be
-  the game — the horde spell-caster becomes one level; other levels could be entirely different
-  mini-games sharing the same netcode, with the **host picking which level/game** to run and
-  broadcasting that choice. **Not active until the spell-game slice proves out.** The architecture
-  is already most of the way there:
-  - the level is a **swappable child node** in `main.tscn` (`TestLevel` instance), not hard-wired
-    into the game logic;
-  - player spawning is **level-agnostic** — `main.gd` finds `PlayerSpawnPosition` via
-    `find_child(...)`, so any level with that marker just works;
-  - `GameManager`/`GameConfig` + the existing host→client RPC pattern already carry pre-game
-    config, so a `selected_level` field + a broadcast RPC slot in cleanly.
+- **Steam networking** — replace the ENet peer with `SteamMultiplayerPeer`; keep all spawn/RPC
+  logic identical (the point of `NetworkManager`). Backlog; the milestone-1 transport decision
+  may pull it forward.
+- **netfox (or equivalent) as a networking foundation.** Evaluated during the remote-smoothing
+  work (PR #55) and deliberately deferred: its rollback/prediction core is overkill for
+  host-authoritative co-op. Revisit as **one** decision if/when we want lag compensation,
+  client-side prediction, or **`netfox.noray`** for NAT punch-through — the noray piece is
+  exactly milestone 1's question. Adopt a foundation on its own merits, not to patch a symptom.
+- **Cloudflare Workers / WebSocket relay** — an alternative milestone-1 answer if noray
+  disappoints.
+- **Noita-style material simulation** — frozen with the fixture; cheap tagged volumes were
+  always the ceiling here. Expensive and hard to net-replicate in 3D.
+- **Mana resource** — `StaminaComponent` is kept (unused) as the future pool, if a game wants
+  ability costs beyond cooldowns.
+- **Multi-game sandbox / host-picks-the-level.** No longer parked — this *is* the project
+  vision, absorbed into the roadmap. The implementation notes stand: the level is a swappable
+  child of `main.tscn`; spawning is level-agnostic (`find_child("PlayerSpawnPosition")`);
+  `GameManager`/`GameConfig` + the host→client RPC pattern carry pre-game config, so
+  `selected_level` + a broadcast slot in cleanly (milestone 2).
