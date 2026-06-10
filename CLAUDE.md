@@ -78,7 +78,9 @@ here for the *how*.
 
 - **Input authority:** Each player is `multiplayer_authority` over their own `Player` node and
   `PlayerInputSynchronizerComponent`. Input is gathered locally only on the authority peer,
-  then synced to all.
+  then synced to all. (Today no remote system *consumes* the synced input — movement arrives as
+  replicated position; the replication is kept deliberately as a seam — see the component note
+  in the File Map.)
 - **Physics / simulation authority:** Each player **simulates its own character** on its
   owning peer (movement runs there); position replicates **from the owning peer** to all via
   `MultiplayerSynchronizer`. **Health / damage / death are host-authoritative** — resolved on
@@ -281,6 +283,13 @@ components/
                               — Extends MultiplayerSynchronizer. Gathers input on the authority
                                 peer, replicates it (mode 2). Syncs `movement_vector` (WASD) +
                                 `is_jump_pressed`. Cast is RPC-driven; interact is roadmap.
+                                NOTE: the synced fields are consumed ONLY by the owning peer
+                                today — remote copies simulate nothing from input (movement
+                                replicates as position). The mode-2 replication is kept on
+                                purpose as the seam for host-side input validation or
+                                client-side prediction if real-latency playtests demand them
+                                (DESIGN.md authority decision); don't "optimize" it away
+                                without revisiting that decision.
   locomotion_animator.gd      — Reusable script on a visual scene root. Drives a locomotion
                                 BlendSpace1D (idle↔run) from a fed speed, fires a OneShot
                                 (`fire_oneshot`) for a layered action, code-sets the OneShot's
