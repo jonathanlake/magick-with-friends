@@ -1,20 +1,25 @@
 ## Transport contract — read before adding any connection code.
 ##
-## The rest of the codebase calls ONLY these three functions:
-##   NetworkManager.host_game()
-##   NetworkManager.join_game(ip)
+## The rest of the codebase calls ONLY these functions:
+##   NetworkManager.host_game()       -> Error (synchronous failure, e.g. port already bound)
+##   NetworkManager.join_game(ip)     -> Error (synchronous failure only; async failures
+##                                      arrive via connection_failed)
 ##   NetworkManager.disconnect_game()
+##   NetworkManager.kick_peer(id)     (host-only)
 ##
 ## All ENet (or future Steam / relay) code lives exclusively in host_game() and
 ## join_game(). Every other file stays transport-agnostic. To swap transports:
-##   1. Replace the two lines inside host_game() / join_game() that create the peer.
+##   1. Replace the peer-creation lines inside host_game() / join_game().
 ##   2. Touch nothing else.
 ##
 ## Example future swap (Steam):
-##   func host_game(...) -> void:
+##   func host_game(...) -> Error:
 ##       var peer := SteamMultiplayerPeer.new()
-##       peer.create_host(GameManager.config.max_players)
+##       var err := peer.create_host(GameManager.config.max_players - 1)
+##       if err != OK:
+##           return err
 ##       multiplayer.multiplayer_peer = peer
+##       return OK
 ##
 ## The signal layer (multiplayer.*) is above the transport and stays identical
 ## across ENet / Steam / WebRTC, so all signal wiring here is reusable.
@@ -41,30 +46,50 @@ const DEFAULT_PORT := 3000
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-func host_game(port: int = DEFAULT_PORT) -> void:
+## Returns the create error so the caller can stay on the menu and tell the user — a failed
+## host (port already bound: e.g. a second host on this machine) must NOT fall through into the
+## game, where the default OfflineMultiplayerPeer would fake is_server() and boot a phantom
+## solo session nobody can join. No connection_failed here: that signal is the CLIENT contract.
+func host_game(port: int = DEFAULT_PORT) -> Error:
 	# ── ENet transport ───────────────────────────────────────────────────────
 	var peer := ENetMultiplayerPeer.new()
-	if peer.create_server(port) != OK:
-		connection_failed.emit()
-		return
-	multiplayer.multiplayer_peer = peer
+	# Cap transport connections to the session size (the host occupies one max_players slot, so
+	# clients get the rest). Excess connectors are refused at the transport — their join fails
+	# fast at the menu instead of connecting into a session that will never spawn them.
+	var err := peer.create_server(port, maxi(1, GameManager.config.max_players - 1))
 	# ────────────────────────────────────────────────────────────────────────
+	if err != OK:
+		return err
+	multiplayer.multiplayer_peer = peer
+	return OK
 
 
-func join_game(ip: String, port: int = DEFAULT_PORT) -> void:
+## Returns a synchronous create error (bad address, socket failure). The normal failure path —
+## host unreachable / refused — is asynchronous and arrives via connection_failed.
+func join_game(ip: String, port: int = DEFAULT_PORT) -> Error:
 	# ── ENet transport ───────────────────────────────────────────────────────
 	var peer := ENetMultiplayerPeer.new()
-	if peer.create_client(ip, port) != OK:
-		connection_failed.emit()
-		return
-	multiplayer.multiplayer_peer = peer
+	var err := peer.create_client(ip, port)
 	# ────────────────────────────────────────────────────────────────────────
+	if err != OK:
+		connection_failed.emit()
+		return err
+	multiplayer.multiplayer_peer = peer
+	return OK
 
 
 func disconnect_game() -> void:
 	if multiplayer.multiplayer_peer:
 		multiplayer.multiplayer_peer.close()
 		multiplayer.multiplayer_peer = null
+
+
+## Host-only: forcibly disconnect a peer (e.g. the spawn-gate refusing an over-capacity join).
+## The kicked client gets server_disconnected and falls back to its menu instead of hanging
+## player-less. Transport-agnostic — goes through the generic MultiplayerPeer API, never ENet.
+func kick_peer(peer_id: int) -> void:
+	if multiplayer.multiplayer_peer != null and multiplayer.is_server():
+		multiplayer.multiplayer_peer.disconnect_peer(peer_id)
 
 # ── Internal signal routing ───────────────────────────────────────────────────
 
