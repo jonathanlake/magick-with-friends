@@ -6,6 +6,10 @@ Architecture reference for AI-assisted development. Read this before touching an
 **decision-led** (what/why); this file is **structure-led** (how the code is organized + the
 dev workflow): rules, file map, the non-obvious Godot gotchas. Expect some overlap — when a fact
 is in both, the *decision* lives in `DESIGN.md` and the *implementation detail* lives here.
+Two **reference-led** docs trace specific systems end-to-end with real function names:
+`docs/NETWORKING.md` (transport, authority, replication, RPCs, lifecycles, edge cases) and
+`docs/SPELLS.md` (the blend system, class-by-class). Reach for those to answer "what happens
+when X?"; reach for this file for rules and gotchas.
 
 In one line: a **3D online co-op, first-person, horde** game; combat is the **BLEND spell
 system** (Form × Element → one fused cast). It began as a generic multiplayer "friend slop"
@@ -32,6 +36,9 @@ event bus are good practice on their own merit, not because of the sandbox — k
   below); do not open the PR if it reports parse/scene errors.
 - **End-of-task confirmation.** After pushing, always report: branch name, whether it's
   been pushed to remote, and a list of files changed.
+- **Keep the reference docs true.** A PR that changes networking behavior updates
+  `docs/NETWORKING.md` in the same PR; one that changes spell behavior updates
+  `docs/SPELLS.md`. Code is truth — a doc/code mismatch is a doc bug.
 
 ---
 
@@ -61,20 +68,24 @@ event bus are good practice on their own merit, not because of the sandbox — k
 ### NetworkManager — Swappable Transport Layer
 
 `NetworkManager` (`autoloads/network_manager.gd`) is the **only** file that knows which
-transport is in use. The rest of the codebase calls `host_game()` / `join_game(ip)` /
-`disconnect_game()` and listens to its signals (`connection_succeeded`, `connection_failed`,
-`server_disconnected`, `peer_connected(id)`, `peer_disconnected(id)`).
+transport is in use. The rest of the codebase calls `host_game() -> Error` /
+`join_game(ip, port) -> Error` / `disconnect_game()` / `kick_peer(id)` (host-only) and listens
+to its signals (`connection_succeeded`, `connection_failed`, `server_disconnected`,
+`peer_connected(id)`, `peer_disconnected(id)`). A failed host create (port already bound)
+returns the error — the caller must stay on the menu, never enter the game peerless. The
+server caps transport connections at `max_players - 1` (the host holds the remaining slot).
 
-**To swap ENet for Steam/relay:** replace the two lines inside `host_game()` and `join_game()`
-that create the peer. Nothing else changes — the `multiplayer.*` signal layer above the
-transport is identical across backends. The file opens with a formal transport contract
-comment; read it before adding any connection code.
+**To swap ENet for Steam/relay:** replace the peer-creation lines inside `host_game()` and
+`join_game()`. Nothing else changes — the `multiplayer.*` signal layer above the transport is
+identical across backends. The file opens with a formal transport contract comment; read it
+before adding any connection code. (Full API + signal tables: `docs/NETWORKING.md` §2.)
 
 ### Multiplayer Model
 
 ENet host/client. One player is the server (host, peer ID `1`); others are clients. This is the
 **implementation home for the authority model decided in `DESIGN.md`** — other sections defer
-here for the *how*.
+here for the *how*. (Traced lifecycles — join, damage→death→respawn, every disconnect path —
+plus the full replication/RPC tables and edge-case matrix live in `docs/NETWORKING.md`.)
 
 - **Input authority:** Each player is `multiplayer_authority` over their own `Player` node and
   `PlayerInputSynchronizerComponent`. Input is gathered locally only on the authority peer,
@@ -232,7 +243,9 @@ Players and enemies use KayKit models (gitignored `/assets/`) animated through o
 ### Spell System — BLEND (the combat core)
 
 A spell fuses two swappable slots **on cast** → **one fused effect** (NOT a sequence/program;
-see `DESIGN.md` for the blend rationale and the legibility north star):
+see `DESIGN.md` for the blend rationale and the legibility north star). The class-by-class
+reference — every property, the cast pipeline, hit/reaction resolution, how to add content —
+is `docs/SPELLS.md`:
 
 - **Form** — delivery shape, where the mechanical distinctness lives (the ~7-Form ceiling + the
   candidate list is a *decision* — see `DESIGN.md`). *Slice:* Projectile, AoE burst.
@@ -358,6 +371,15 @@ debug/
 
 tools/
   smoke-test.sh               — Headless gameplay smoke test (see Headless Validation).
+
+docs/
+  NETWORKING.md               — Reference-led: the multiplayer spine traced end-to-end —
+                                transport seam, authority tables, every replicated property,
+                                the full RPC catalog, connect/disconnect/death lifecycles, the
+                                edge-case matrix, and the reusing-the-spine checklist.
+  SPELLS.md                   — Reference-led: the BLEND system class-by-class — every @export,
+                                the cast pipeline (FP dual-visual, release timing), hit +
+                                reaction resolution, the cosmetic layer, how to add content.
 
 main.gd                       — Spawner setup (player/projectile/enemy), peer_ready RPC,
                                 spawn_functions, host damage/death/respawn RPCs + self-damage cue,
@@ -582,8 +604,8 @@ two hand-rolled `grab_focus` workarounds failed before a doc check found the one
     (world+players+enemies — enemies collide with the arena, players, and each other so they don't stack).
   - **projectile** (`projectile.tscn` Area3D): `collision_layer = 8`, `collision_mask = 6`
     (players+enemies — friendly fire ON, hits both, **ignores world**). It despawns on
-    Player/HealthComponent hits + lifetime, so walls don't stop it (add `world` to the mask + handle
-    it if wall-despawn is ever wanted).
+    Player/HealthComponent hits + lifetime, so walls don't stop a single-target bolt. **Bursts
+    flip their mask to 7 at runtime** (`projectile.gd:setup`) so they detonate on floors/walls.
 - **`input_multiplayer_authority` propagation (verified OK — not a bug).** Earlier notes calling
   this "host-only / broken cross-machine" were a misdiagnosis; it propagates correctly. **Repro:**
   enable the DEBUG autoload + run two-window — the `[AUTH]` line in `player.gd` prints each copy's
