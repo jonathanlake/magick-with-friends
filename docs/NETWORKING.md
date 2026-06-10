@@ -258,15 +258,15 @@ resulting value with `_sync_health.rpc(...)`. Two consequences worth internalizi
 | Caster's own bolt at the muzzle | Direct hits on own body ignored; the caster **can** still be caught in their own burst (friendly-fire comedy) | `projectile.gd:_on_body_entered` |
 | Respawn teleport vs. lagging replication | Remote Visuals snap to the broadcast spawn point and **park** until the body's teleport replicates (or 1 s timeout) | `remote_visual_smoother.gd:teleport`, `main.gd:_respawn_player` |
 | Damage cue on the host | See §8 — never compare before/after values | `main.gd:_sync_health` |
-| **KNOWN GAP — late join, stale state** | A late joiner receives every player's **original** spawn data: a damaged player shows full health, a dead player stands at the death spot, and a player who swapped spells shows the spawn-rolled blend until the next sync event. Needs a host→new-peer state push on `peer_connected`. | (unhandled; audit P7) |
+| **KNOWN GAP — late join, stale state** | A late joiner receives every player's **original** spawn data: a damaged player shows full health, a dead player stands at the death spot, and a player who swapped spells shows the spawn-rolled blend until the next sync event. Needs a host→new-peer state push on `peer_connected`. | (unhandled — framework milestone 3, `DESIGN.md` roadmap) |
 | **KNOWN GAP — single spawn point** | All spawns/respawns use one `PlayerSpawnPosition`; simultaneous spawns shove each other (players collide). Spawn-point system is a roadmap item. | `main.gd` |
 | **KNOWN GAP — remote enemies stutter** | Enemy `global_position` is snapped with no Visual smoothing; `RemoteVisualSmoother` was built to be reused for them (deferred — slow/distant motion hides it for now). | `enemy_base.tscn` |
 
 ## 10. Reusing the Spine (the framework story)
 
 The codebase deliberately splits into a **game-agnostic spine** and **game-specific systems**.
-(Per `DESIGN.md`, the reusable-framework future earns no *architectural* weight until a second
-game needs it — but the seams already exist and cost nothing to keep clean.)
+(Per `DESIGN.md`'s 2026-06-10 reframe, the framework **is** the project — the spell game is its
+test fixture. This section is the map of what carries to the next game.)
 
 **Game-agnostic (carries to any host-client co-op game):**
 

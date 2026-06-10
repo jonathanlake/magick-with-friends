@@ -11,15 +11,17 @@ Two **reference-led** docs trace specific systems end-to-end with real function 
 `docs/SPELLS.md` (the blend system, class-by-class). Reach for those to answer "what happens
 when X?"; reach for this file for rules and gotchas.
 
-In one line: a **3D online co-op, first-person, horde** game; combat is the **BLEND spell
-system** (Form × Element → one fused cast). It began as a generic multiplayer "friend slop"
-framework; the networking spine carries over, movement/camera/combat are being (re)built.
-Where this doc describes a system the code doesn't implement yet, it's marked roadmap.
+In one line: a **reusable host-client co-op multiplayer framework** for Godot (the
+"friendslop framework" — 2–8 players, friend groups) plus its **test fixture**: a 3D
+first-person horde game whose combat is the BLEND spell system (Form × Element → one fused
+cast). The fixture is **frozen as a game** — it exists to exercise the spine. Where this doc
+describes a system the code doesn't implement yet, it's marked roadmap.
 
-**Build this game.** A reusable-spine / swappable-mini-game-sandbox future is parked in `DESIGN.md`,
-but it earns **no architectural weight until a second game needs it** — "keeps the spine reusable" is
-not a tiebreaker yet. (The `NetworkManager` transport seam, the component pattern, and the `GameEvents`
-event bus are good practice on their own merit, not because of the sandbox — keep them regardless.)
+**Build the framework.** (Reframed 2026-06-10 — supersedes the old "Build this game" frame;
+the reframe note atop `DESIGN.md` is canonical.) The product is the reusable co-op spine;
+**Magick With Friends is the test fixture** — no new Forms, pickups, or fun-tuning; fixture
+work only when it blocks a framework milestone. "Keeps the spine reusable" **is** now a
+tiebreaker. The roadmap is framework milestones (`DESIGN.md`), led by real-online verification.
 
 ---
 
@@ -60,6 +62,13 @@ event bus are good practice on their own merit, not because of the sandbox — k
 - **Swappable transport.** All network peer creation lives in `NetworkManager.host_game()`
   and `NetworkManager.join_game()` only. No other file may import or reference
   `ENetMultiplayerPeer` (or any future transport class) directly.
+- **Import direction (spine → game, never the reverse).** Spine files — `network_manager.gd`,
+  `game_manager.gd`, `game_events.gd`, everything in `components/`, `debug/`, `ui/main_menu/`,
+  `ui/console/` — must not gain **new** references to game nouns (spells, waves, enemies).
+  Game/fixture code imports the spine. Known debts (tagged FIXTURE in the file map, separated
+  at roadmap milestone 2): `spell_catalog.gd` is fixture code parked in `autoloads/`,
+  `game_events.gd` carries fixture `enemy_*` signals, `main.gd`/`main.tscn` are the mixed
+  composition root, `ui/hud/` is fixture-leaning. Don't deepen these debts.
 
 ---
 
@@ -240,7 +249,7 @@ Players and enemies use KayKit models (gitignored `/assets/`) animated through o
 - **Looping** on Idle/Run is set in the glb **import dock** (author action, not code); the attack clip
   stays **non-looping** so the OneShot ends and returns to locomotion.
 
-### Spell System — BLEND (the combat core)
+### Spell System — BLEND (fixture combat core — frozen as a game)
 
 A spell fuses two swappable slots **on cast** → **one fused effect** (NOT a sequence/program;
 see `DESIGN.md` for the blend rationale and the legibility north star). The class-by-class
@@ -262,9 +271,10 @@ could slot in without reworking the wand.
 **Host-authoritative** (see Multiplayer Model): casts originate on the authority peer; the host
 spawns + resolves them (damage incl. friendly fire, reactions) and replicates out. **Reactions**
 are two cheap layers (NOT a pixel sim): entity status (lightning chains to nearby units incl.
-allies; fire burns + spreads) and a few hand-placed `Area3D` world volumes (oil, water).
-**Acquisition** is random keep-or-swap (interact-to-swap; drops your old spell as a re-grabbable
-pickup). Design rationale for all of this lives in `DESIGN.md`.
+allies; fire burns + spreads — built) and `Area3D` world volumes (oil, water — never built,
+**frozen** with the fixture). **Acquisition** (keep-or-swap pickups) was **cut by the framework
+reframe** — the dev-console `give [all]` stand-in remains. Frozen design rationale lives in
+`DESIGN.md` → the Fixture section.
 
 ---
 
@@ -275,11 +285,13 @@ autoloads/
   game_events.gd              — Global signal bus. Add signals here, not in random scripts.
                                 Has `enemy_died`, `enemy_count_changed(count)` + `alive_enemy_count`
                                 (register_enemy/unregister_enemy), and `local_player_damaged` (FP
-                                hit cue, via `emit_local_player_damaged()`). Fuller vocabulary is a
-                                DESIGN.md roadmap item.
+                                hit cue, via `emit_local_player_damaged()`). Fuller vocabulary is
+                                DESIGN.md backlog. NOTE: the `enemy_*` signals are fixture nouns on
+                                a spine autoload — an import-direction debt, cleaned at milestone 2.
   game_manager.gd             — Autoload Node. Owns GameConfig + local player_name.
-  spell_catalog.gd            — Autoload. Index-stable Form/Element arrays + `make_blend(f,e)` so
-                                every peer builds the SAME spell from replicated indices. BUILT.
+  spell_catalog.gd            — FIXTURE (parked in autoloads/ — moves under games/ at milestone 2).
+                                Index-stable Form/Element arrays + `make_blend(f,e)` so every peer
+                                builds the SAME spell from replicated indices. BUILT.
   network_manager.gd          — Transport abstraction. ONLY file that touches ENet/Steam/relay.
 
 components/
@@ -328,28 +340,29 @@ entities/
                                 capsule collider, camera. (WandComponent is added in code.)
     player_visual.tscn        — The visible rig: KayKit Mage (.glb) + an AnimationTree (BlendTree:
                                 idle↔run BlendSpace1D + a OneShot cast) + LocomotionAnimator. BUILT.
-  projectiles/                — projectile.gd/.tscn: host-spawned + host-resolved spell projectile
+  projectiles/                — FIXTURE. projectile.gd/.tscn: host-spawned + host-resolved spell projectile
                                 (Area3D); its mesh is hidden for the caster (FP dual-visual). BUILT.
                                 spell_tracer.gd: a LOCAL-only first-person cosmetic bolt the caster sees
                                 fly straight from screen-center (the networked bolt — hidden for them —
                                 leaves the staff so others see that). Cosmetic, never networked. BUILT.
-  enemies/                    — enemy_base.gd/.tscn: EnemyBase (CharacterBody3D + HealthComponent +
+  enemies/                    — FIXTURE. enemy_base.gd/.tscn: EnemyBase (CharacterBody3D + HealthComponent +
                                 HitFlashComponent; host AI: gravity / steer / cooldown'd melee;
                                 authors replicated `anim_speed` + `face_yaw`; attack-swing RPC).
                                 enemy_visual.tscn: KayKit Skeleton (.glb) + AnimationTree
                                 (BlendTree: idle↔run + a OneShot attack) + LocomotionAnimator. BUILT.
-  pickups/                    — (roadmap) Form/Element spell pickups (interact-to-swap).
+  pickups/                    — (CUT by the framework reframe — was the interact-to-swap pickup
+                                loop; the console `give` stand-in covers fixture needs.)
 
 systems/
-  spells/                     — Spell/SpellForm/SpellElement/BlendSpell resources +
+  spells/                     — FIXTURE. Spell/SpellForm/SpellElement/BlendSpell resources +
                                 WandComponent. BUILT.
-  reactions/                  — reactions.gd: host-central resolver (Node under Main). Direct
-                                damage + entity reactions (lightning chain incl. allies, fire
-                                burn/DoT); cosmetic broadcasts. BUILT (entity reactions; Area3D
-                                world volumes still roadmap).
-  director/                   — wave_director.gd: host-side escalating ring spawner (timer + waves,
-                                alive cap). Boots PAUSED (`auto_start = false`) — the host begins
-                                the round via the console `start` (set_spawning). BUILT.
+  reactions/                  — FIXTURE. reactions.gd: host-central resolver (Node under Main).
+                                Direct damage + entity reactions (lightning chain incl. allies,
+                                fire burn/DoT); cosmetic broadcasts. BUILT (entity reactions;
+                                Area3D world volumes frozen with the fixture).
+  director/                   — FIXTURE. wave_director.gd: host-side escalating ring spawner
+                                (timer + waves, alive cap). Boots PAUSED (`auto_start = false`) —
+                                the host begins the round via the console `start`. BUILT.
 
 resources/
   game_config.gd              — Resource. max_players, respawn_time. Not an autoload.
@@ -358,7 +371,7 @@ ui/
   main_menu/                  — Host/join flow. Validates name, parses IP:port (default 127.0.0.1:3000).
   hud/                        — DEV debug HUD (CanvasLayer): spell + HP + enemy/player counts + FPS
                                 readout, crosshair, death fade, host-left + self-damage overlays.
-                                (Proximity swap prompt is roadmap.)
+                                Fixture-leaning (spell/enemy readouts) — an import-direction debt.
   console/                    — dev_console.gd: dev console (backtick). Mounted on EVERY peer in
                                 main.gd, gated by role: HOST gets the full set (help / start /
                                 give [all] / players / wave / enemies [off|on|clear] / clear); a
@@ -396,9 +409,10 @@ are the source of truth.)
 
 ---
 
-## What Carries Over From the Framework
+## Spine Status — What's Real Today
 
-The reusable spine that is real and working today:
+The reusable spine that is built and working (the framework's current inventory; the
+spine-vs-fixture split is mapped in `docs/NETWORKING.md` §10):
 
 - [x] Project scaffolding — Jolt, Forward Plus, 1920×1080, D3D12 on Windows
 - [x] **`NetworkManager` autoload** — swappable transport layer; ENet today, Steam/relay ready
@@ -416,8 +430,8 @@ The reusable spine that is real and working today:
 
 > **Online status:** only **same-machine two-window** is verified on this codebase. Per-peer
 > authority *does* propagate correctly (repro in Known Issues); the open gap is **cross-machine
-> transport** (NAT / relay / latency), not an authority fix. Full story + the re-test plan: the
-> **slice playtest** (`DESIGN.md` roadmap item 7 — the real-online re-verify now lives there, canonical).
+> transport** (NAT / relay / latency), not an authority fix. Full story + the test plan:
+> **framework milestone 1** (`DESIGN.md` roadmap — real-online verification, canonical).
 
 ---
 
@@ -611,7 +625,8 @@ two hand-rolled `grab_focus` workarounds failed before a doc check found the one
   enable the DEBUG autoload + run two-window — the `[AUTH]` line in `player.gd` prints each copy's
   authority from every peer's view (a client sees the host's player as `authority=1 is_mine=false`,
   its own as `is_mine=true`). *Why it works* and the still-untested cross-machine transport piece:
-  the slice playtest (`DESIGN.md` roadmap item 7, canonical — don't restate it here).
+  framework milestone 1 (`DESIGN.md` roadmap — real-online verification, canonical — don't
+  restate it here).
 - `main_menu.gd` defaults to `127.0.0.1` and port `3000` (keep the port an `int` — ENet requires it).
 - `multiplayer.connected_to_server` is only wired for the client path; the host transitions
   immediately — correct, don't add host-side handling.

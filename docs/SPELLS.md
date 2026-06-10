@@ -265,7 +265,8 @@ NETWORKING §10 step 4). Mind the ~7-Form ceiling decision in `DESIGN.md`.
 
 **Changing what a player holds at runtime:** always go through
 `WandComponent.request_set_blend(f, e)` — it resolves on the host and broadcasts `_set_blend`
-so every peer rebuilds the identical wand. This is the exact seam the pickup/keep-or-swap
-system (DESIGN item 6) will reuse. Note the late-join caveat: a joiner rebuilds wands from
+so every peer rebuilds the identical wand. (The pickup/keep-or-swap loop that would have used
+this seam was cut by the framework reframe — the seam itself stays, exercised by the console
+`give` and the debug B-cycle.) Note the late-join caveat: a joiner rebuilds wands from
 **original spawn data**, so equip changes made before they joined aren't reflected (known gap,
 NETWORKING §9).

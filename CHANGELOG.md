@@ -7,6 +7,29 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ---
 
+## 2026-06-10 (the framework reframe)
+
+*The framework is the project now — the spell game is its test fixture*
+
+### 📐 Direction
+
+- **Project frame inverted: framework-first.** The durable goal is a reusable **host-client
+  co-op multiplayer framework for Godot** (2–8 players, friend groups, proximity voice chat
+  planned); the spell game was a starter idea, not a passion project, and is now the **test
+  fixture** — kept to exercise the spine, frozen as a game (no new Forms, pickups, or
+  fun-tuning). `DESIGN.md` rewritten around the new vision: framework decisions (frameworks
+  are extracted not designed; import-direction rule; prototypes live in-repo and graduate
+  out) + a milestone roadmap led by **real-online verification**, then restructure →
+  late-join → lobby → spawn points → **proximity voice** → 8-player validation. The spell
+  game's design decisions are preserved in a frozen Fixture section (they explain the code).
+- **CLAUDE.md follows:** "Build this game" → "Build the framework"; a new non-negotiable
+  **import-direction rule** (spine never references game nouns, with today's known debts
+  named: `spell_catalog` in autoloads/, `enemy_*` signals on GameEvents, the mixed `main.gd`,
+  the fixture-leaning HUD); file map entries tagged FIXTURE; stale "roadmap item 7"
+  references now point at framework milestone 1. Docs-only — no code changed.
+
+---
+
 ## 2026-06-09 (remote-player movement smoothing)
 
 *No more sea-sick jitter watching a teammate run*
