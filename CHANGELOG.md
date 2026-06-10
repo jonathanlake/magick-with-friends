@@ -7,6 +7,26 @@ human-readable log of *what changed and why it mattered* — not a substitute fo
 
 ---
 
+## 2026-06-10 (milestone 2: spine/game restructure · milestone 1: online verified)
+
+*The directory tree now tells the truth: framework/ is the product, games/magick/ is the fixture*
+
+### 📐 Direction
+
+- **Real online is PROVEN (milestone 1 ✅).** A remote friend joined a real session over the
+  internet via **playit.gg** (a UDP tunnel the host runs — no port forwarding, no code changes).
+  Recorded as the working transport answer; still gathering during normal play: latency feel,
+  smoothing under real jitter, mid-session disconnect behavior.
+- **Spine/game restructure (milestone 2 ✅).** Everything game-agnostic moved under
+  `framework/` (autoloads, components, debug harness, menu, console, GameConfig); everything
+  spell-game under `games/magick/` (spells, reactions, director, player, enemies, projectiles,
+  HUD, the arena level, the spell catalog autoload). All scene/script/preload/autoload paths
+  rewritten; full headless gate green (`SMOKE: PASS`). The import-direction rule is now visible
+  in the tree. Remaining named follow-ups: the `enemy_*` signals on GameEvents and the mixed
+  `main.gd` composition root — both forced properly by the next prototype.
+
+---
+
 ## 2026-06-10 (the framework reframe)
 
 *The framework is the project now — the spell game is its test fixture*

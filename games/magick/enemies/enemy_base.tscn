@@ -1,9 +1,9 @@
 [gd_scene format=3 uid="uid://bwc6x2oqeqlj2"]
 
-[ext_resource type="Script" uid="uid://ue6wwiaaqpqu" path="res://entities/enemies/enemy_base.gd" id="1_enemy"]
-[ext_resource type="PackedScene" uid="uid://bsde65brylo0j" path="res://components/health_component.tscn" id="2_health"]
-[ext_resource type="PackedScene" path="res://components/hit_flash_component.tscn" id="3_hitflash"]
-[ext_resource type="PackedScene" path="res://entities/enemies/enemy_visual.tscn" id="4_visual"]
+[ext_resource type="Script" uid="uid://ue6wwiaaqpqu" path="res://games/magick/enemies/enemy_base.gd" id="1_enemy"]
+[ext_resource type="PackedScene" uid="uid://bsde65brylo0j" path="res://framework/components/health_component.tscn" id="2_health"]
+[ext_resource type="PackedScene" path="res://framework/components/hit_flash_component.tscn" id="3_hitflash"]
+[ext_resource type="PackedScene" path="res://games/magick/enemies/enemy_visual.tscn" id="4_visual"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_enemy"]
 radius = 0.4

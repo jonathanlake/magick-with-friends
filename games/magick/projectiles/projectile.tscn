@@ -1,6 +1,6 @@
 [gd_scene load_steps=5 format=3]
 
-[ext_resource type="Script" path="res://entities/projectiles/projectile.gd" id="1_proj"]
+[ext_resource type="Script" path="res://games/magick/projectiles/projectile.gd" id="1_proj"]
 
 [sub_resource type="SphereMesh" id="SphereMesh_proj"]
 radius = 0.2

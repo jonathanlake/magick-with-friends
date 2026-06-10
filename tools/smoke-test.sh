@@ -28,7 +28,7 @@ fi
 BAK="$(mktemp)"
 cp project.godot "$BAK"
 trap 'cp "$BAK" project.godot; rm -f "$BAK"' EXIT
-sed -i 's|DEBUG="res://debug/debug.gd"|DEBUG="*res://debug/debug.gd"|' project.godot
+sed -i 's|DEBUG="res://framework/debug/debug.gd"|DEBUG="*res://framework/debug/debug.gd"|' project.godot
 
 LOG="$(mktemp)"
 # --quit-after is a frame backstop; the smoke driver normally quits itself within ~31 frames.

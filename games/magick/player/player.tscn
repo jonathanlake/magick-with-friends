@@ -1,10 +1,10 @@
 [gd_scene format=3 uid="uid://cunquuhctdb1o"]
 
-[ext_resource type="Script" uid="uid://dafgom3bb27s6" path="res://entities/player/player.gd" id="1_symyc"]
-[ext_resource type="PackedScene" uid="uid://cvfl2msql7gnl" path="res://components/player_input_synchronizer_component.tscn" id="2_sglur"]
-[ext_resource type="PackedScene" uid="uid://bsde65brylo0j" path="res://components/health_component.tscn" id="3_bls4j"]
-[ext_resource type="PackedScene" path="res://components/hit_flash_component.tscn" id="4_hitflash"]
-[ext_resource type="PackedScene" uid="uid://cg1pvs3eyq42f" path="res://entities/player/player_visual.tscn" id="5_visual"]
+[ext_resource type="Script" uid="uid://dafgom3bb27s6" path="res://games/magick/player/player.gd" id="1_symyc"]
+[ext_resource type="PackedScene" uid="uid://cvfl2msql7gnl" path="res://framework/components/player_input_synchronizer_component.tscn" id="2_sglur"]
+[ext_resource type="PackedScene" uid="uid://bsde65brylo0j" path="res://framework/components/health_component.tscn" id="3_bls4j"]
+[ext_resource type="PackedScene" path="res://framework/components/hit_flash_component.tscn" id="4_hitflash"]
+[ext_resource type="PackedScene" uid="uid://cg1pvs3eyq42f" path="res://games/magick/player/player_visual.tscn" id="5_visual"]
 
 [sub_resource type="SceneReplicationConfig" id="SceneReplicationConfig_symyc"]
 properties/0/path = NodePath(".:global_position")

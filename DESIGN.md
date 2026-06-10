@@ -30,14 +30,15 @@ solid, documented, and boring, so all the energy goes into the game.
 **Flagship capabilities (built or planned):**
 
 - Robust connect / host / disconnect flow with honest error UX *(built; real-online
-  verification is milestone 1)*
+  **verified** — see milestone 1)*
 - Host-authoritative simulation with per-player input authority *(built — the decided
   authority model below)*
 - Replicated spawning of players / entities with late-join replay *(built; late-join
   state sync is milestone 3)*
 - Lobby / ready flow *(milestone 4)* · spawn points *(milestone 5)*
 - **Proximity voice chat** *(milestone 6 — the headline feature)*
-- NAT traversal / relay so friends don't fight port forwarding *(decided at milestone 1)*
+- NAT traversal / relay so friends don't fight port forwarding *(working answer: **playit.gg**
+  — see milestone 1)*
 - Dev ergonomics: two-window autostart, headless validation gate, dev console *(built)*
 
 ### Design decisions (framework-level)
@@ -75,8 +76,11 @@ solid, documented, and boring, so all the energy goes into the game.
 
 **Still open (DECIDE LATER — do not invent these):**
 
-- **Transport for real online** — port-forwarded ENet vs `netfox.noray` vs a hosted relay.
-  Milestone 1 produces the answer; until then ENet + the swappable-transport seam stand.
+- **Transport for real online — working answer found, final answer open.** **playit.gg**
+  (a UDP tunnel the host runs; zero code changes) got a real remote friend into a session —
+  good enough for now. Whether to ever replace it (`netfox.noray`, Steam, a hosted relay) is
+  decided only if playit.gg proves unreliable/laggy in regular sessions or the third-party
+  dependency starts to chafe. The swappable-transport seam keeps all options open.
 - **Voice chat implementation** — milestone 6 opens with a research spike (see roadmap).
 - **Host migration** — probably never (friend groups can re-host); revisit only if drop-outs
   prove painful in real sessions.
@@ -88,19 +92,20 @@ solid, documented, and boring, so all the energy goes into the game.
 Ordered by risk-burndown: verify the core promise before building on top of it. One feature
 per PR, validated per `CLAUDE.md`.
 
-1. **Real-online verification.** The framework's core promise — *online* co-op — is verified
-   only same-machine two-window today. A **real-connection, 2-machine session over the
-   internet**: start with port-forwarded ENet (zero new code), evaluate `netfox.noray` / a
-   relay as the NAT-traversal answer. Measure: connect reliability, disconnect handling under
-   real conditions, latency feel (host-authoritative casting with no prediction is the #1
-   risk), remote-player smoothing under real jitter. Per-peer authority already propagates
-   correctly (the two-window `[AUTH]` repro in `CLAUDE.md`); the open gap is **transport**,
-   not authority.
-2. **Spine/game restructure.** Move fixture code under `games/magick/` (or similar) and the
-   spine toward an `addons/`-shaped layout, making the import-direction rule visible in the
-   directory tree. Do the moves **in the Godot editor** (several `.tscn` still lack uids;
-   editor moves keep refs intact). This is also when a `selected_level` field +
-   host-broadcast lands cleanly in `GameConfig` if multiple prototypes exist.
+1. **Real-online verification. ✅ SUBSTANTIALLY DONE (2026-06-10).** A real remote friend
+   joined a session over the internet via **playit.gg** (a UDP tunnel the host runs — no port
+   forwarding, zero code changes). The core promise is proven; per-peer authority propagates
+   (the two-window `[AUTH]` repro in `CLAUDE.md` plus the live session). **Still open, gather
+   during normal play:** latency *feel* over a real link (host-authoritative casting with no
+   prediction is the #1 risk — rotate who hosts), remote-player smoothing under real jitter,
+   and mid-session disconnect behavior. The transport *decision* (keep playit.gg vs noray/
+   Steam/relay) stays open — see Still-open decisions above.
+2. **Spine/game restructure. ✅ DONE (2026-06-10).** Fixture code lives under `games/magick/`,
+   the spine under `framework/` — the import-direction rule is visible in the directory tree.
+   Two named follow-ups remain, forced properly by the next prototype: **(a)** split the
+   fixture `enemy_*` signals off `framework/autoloads/game_events.gd`; **(b)** split the mixed
+   `main.gd`/`main.tscn` composition root per-game (this is also when `selected_level` +
+   host-broadcast land in `GameConfig`).
 3. **Late-join state push.** Close the known gap: on `peer_connected`, the host pushes
    current health / dead flags / equip state to the new peer (reuses `_sync_health` /
    `_set_dead` / the wand equip-sync). Required for drop-in friend sessions.

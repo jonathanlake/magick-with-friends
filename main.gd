@@ -2,11 +2,11 @@ extends Node
 
 var player_scene: PackedScene = preload("uid://cunquuhctdb1o")
 var _hud_scene: PackedScene = preload("uid://ct7hud5x8kl3n")
-var _console_scene: PackedScene = preload("res://ui/console/dev_console.tscn")
+var _console_scene: PackedScene = preload("res://framework/ui/console/dev_console.tscn")
 # projectile.tscn (and dev_console.tscn above) stay path-referenced — the editor hasn't
 # assigned them a uid yet (their headers have none; never hand-write one). Swap to
 # preload("uid://...") once it does, like enemy_base below.
-var projectile_scene: PackedScene = preload("res://entities/projectiles/projectile.tscn")
+var projectile_scene: PackedScene = preload("res://games/magick/projectiles/projectile.tscn")
 var enemy_scene: PackedScene = preload("uid://bwc6x2oqeqlj2")  # enemy_base.tscn
 # main_menu.tscn — load()ed at runtime (NOT preload) to avoid a cyclic scene dependency:
 # main_menu.gd preloads main.tscn, which uses this script, so preloading the menu here would

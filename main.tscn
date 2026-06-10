@@ -1,9 +1,9 @@
 [gd_scene format=3 uid="uid://dxjewv468c6y2"]
 
 [ext_resource type="Script" uid="uid://dflwhhwh3n8b1" path="res://main.gd" id="1_ig7tw"]
-[ext_resource type="PackedScene" uid="uid://c4p2kqr5s8n7m" path="res://test_level.tscn" id="2_0xm2m"]
-[ext_resource type="Script" path="res://systems/director/wave_director.gd" id="3_wd"]
-[ext_resource type="Script" path="res://systems/reactions/reactions.gd" id="4_react"]
+[ext_resource type="PackedScene" uid="uid://c4p2kqr5s8n7m" path="res://games/magick/levels/test_level.tscn" id="2_0xm2m"]
+[ext_resource type="Script" path="res://games/magick/director/wave_director.gd" id="3_wd"]
+[ext_resource type="Script" path="res://games/magick/reactions/reactions.gd" id="4_react"]
 
 [node name="Main" type="Node" unique_id=1960346110]
 script = ExtResource("1_ig7tw")
